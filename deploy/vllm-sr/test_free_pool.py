@@ -176,3 +176,27 @@ def test_payment_required_blocks_backend_as_not_free():
     blk, (ts, b, _) = st["blocked"]["samba-glm-5.3"], st["events"][-1]
     assert b == "samba-glm-5.3" and "402" in blk["why"]
     assert blk["until"] - ts >= fp.EXCLUDE_S  # long enough that free-pace pulls it from the cascade
+
+
+def test_undecodable_402_still_blocks_backend():
+    # Live 11-15: SambaNova's 402 body failed the router's decoder, so its execution_record had attempts: null and
+    # the status only appeared on a separate neutral_transport_error_decode_failed line (logged after it).
+    rec = {"request_id": "r2", "decision_name": "m-glm-5.3", "initial_model": "samba-glm-5.3", "attempts": None}
+    lines = [json.dumps({"msg": "fallback_execution_complete", "ts": "2026-11-16T00:33:13.205", "request_id": "r2",
+                         "execution_record": json.dumps(rec)}),
+             json.dumps({"msg": "neutral_transport_error_decode_failed", "ts": "2026-11-16T00:33:13.206",
+                         "request_id": "r2", "status": 402})]
+    st = {"events": [], "blocked": {}}
+    fp.ingest(st, lines, now=1_800_000_000)
+    assert "402" in st["blocked"]["samba-glm-5.3"]["why"]
+
+
+def test_undecodable_402_on_pinned_endpoint_blocks_backend():
+    # b/ endpoints have fallback off: the router writes only routing_decision + decode_failed, no execution_record.
+    lines = [json.dumps({"msg": "routing_decision", "request_id": "r3", "selected_model": "samba-glm-5.3"}),
+             json.dumps({"msg": "neutral_transport_error_decode_failed", "request_id": "r3", "status": 402})]
+    st = {"events": [], "blocked": {}}
+    fp.ingest(st, lines, now=1_800_000_000)
+    assert "402" in st["blocked"]["samba-glm-5.3"]["why"]
+    fp.ingest(st, lines, now=1_800_000_060)  # re-read log window: counted once
+    assert sum(1 for e in st["events"] if e[1] == "samba-glm-5.3") == 1

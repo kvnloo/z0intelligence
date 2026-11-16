@@ -409,8 +409,27 @@ def pod_log(since_s):
     return r.stdout.splitlines()
 
 
+def _decode_failures(lines):
+    """request_id -> (status, routed backend) for upstream errors the router could not decode. Their execution_record
+    has attempts: null, and pinned (no-fallback) requests write no execution_record at all, only routing_decision."""
+    status, routed = {}, {}
+    for line in lines:
+        if "neutral_transport_error_decode_failed" not in line and '"routing_decision"' not in line:
+            continue
+        try:
+            d = json.loads(line)
+            if d.get("msg") == "routing_decision":
+                routed[d["request_id"]] = d.get("selected_model", "")
+            else:
+                status[d["request_id"]] = int(d["status"])
+        except (ValueError, KeyError, TypeError):
+            pass
+    return {rid: (s, routed.get(rid, "")) for rid, s in status.items()}
+
+
 def ingest(st, lines, now):
     seen = st.setdefault("seen", {})
+    undecoded = _decode_failures(lines)
     for line in lines:
         if '"llm_usage"' not in line and "fallback_execution_complete" not in line:
             continue
@@ -428,25 +447,39 @@ def ingest(st, lines, now):
             toks = (d.get("prompt_tokens") or 0) - (d.get("cached_prompt_tokens") or 0) + (d.get("completion_tokens") or 0)
             st["events"].append([ts, bucket(d.get("model", "")), max(toks, 0)])
         elif "execution_record" in d:
-            for a in (json.loads(d["execution_record"]).get("attempts") or []):
-                key = f"a:{a.get('attempt_id')}"
-                if key in seen or a.get("status_code") is None:
-                    continue
-                seen[key] = now
-                b = bucket(a.get("model", ""))
-                if a.get("status_code") != 200:
-                    st["events"].append([ts, b, 0])  # a refused call still spends a request
-                code, err = a.get("status_code"), a.get("error") or ""
-                if code == 402 or (code == 429 and DEAD_429.search(err)):
-                    # no free balance at all (insufficient funds): not free until it answers again; recheck in 6 h
-                    until, why = ts + NO_BALANCE_S, f"{code} no balance: " + err[:150]
-                elif code == 429:
-                    until, why = ts + reset_after(err, ts), "429: " + err[:160]
-                else:
-                    continue
-                if until > st["blocked"].get(b, {}).get("until", 0):
-                    st["blocked"][b] = {"until": until, "why": why}
+            rec = json.loads(d["execution_record"])
+            attempts = rec.get("attempts") or ([_undecoded_attempt(rid, undecoded.pop(rid)[0], rec.get("initial_model", ""))]
+                                               if rid in undecoded else [])
+            _attempts(st, seen, attempts, ts, now)
+    for rid, (code, model) in undecoded.items():  # pinned requests: no execution_record to hang the status on
+        if model:
+            _attempts(st, seen, [_undecoded_attempt(rid, code, model)], now, now)
     st["seen"] = {k: v for k, v in seen.items() if now - v < 2 * HOUR}
+
+
+def _undecoded_attempt(rid, code, model):
+    return {"attempt_id": f"undecoded:{rid}", "model": model, "status_code": code, "error": "undecodable upstream error"}
+
+
+def _attempts(st, seen, attempts, ts, now):
+    for a in attempts:
+        key = f"a:{a.get('attempt_id')}"
+        if key in seen or a.get("status_code") is None:
+            continue
+        seen[key] = now
+        b = bucket(a.get("model", ""))
+        if a.get("status_code") != 200:
+            st["events"].append([ts, b, 0])  # a refused call still spends a request
+        code, err = a.get("status_code"), a.get("error") or ""
+        if code == 402 or (code == 429 and DEAD_429.search(err)):
+            # no free balance at all (insufficient funds): not free until it answers again; recheck in 6 h
+            until, why = ts + NO_BALANCE_S, f"{code} no balance: " + err[:150]
+        elif code == 429:
+            until, why = ts + reset_after(err, ts), "429: " + err[:160]
+        else:
+            continue
+        if until > st["blocked"].get(b, {}).get("until", 0):
+            st["blocked"][b] = {"until": until, "why": why}
 
 
 def assess(st, now):
