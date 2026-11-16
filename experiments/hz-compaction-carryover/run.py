@@ -6,7 +6,7 @@ decisions (some later revised) amid filler tool output. A compactor squeezes the
 session into a word budget. An item is carried when its current value appears in
 the compacted text and no superseded value of the same key does.
 
-    python experiments/hz-compaction-carryover/run.py --arm head-tail --tier public --out result.json
+    python3 experiments/hz-compaction-carryover/run.py --arm head-tail --tier public --out result.json
 
 Add a candidate: write `def compactor_<name>(turns, budget) -> str`, register it in
 ARMS as `compactor-<name>`, and run it. Any candidate is scored against the control
@@ -124,7 +124,7 @@ def result(arm: str, data: list[dict]) -> dict:
          "repo_sha": sha or "unknown", "n": len(data),
          "metric": {"name": "carryover_error_rate", "value": round(mean(errs), 6),
                     "ci95": [round(x, 6) for x in bootstrap_ci(errs)]},
-         "verdict": "NULL", "command": f"python experiments/hz-compaction-carryover/run.py --arm {arm} --tier public",
+         "verdict": "NULL", "command": f"python3 experiments/hz-compaction-carryover/run.py --arm {arm} --tier public",
          "notes": f"{len(data)} synthetic sessions, seed {SEED}, budget {BUDGET} words. Control arm: no verdict."}
     if arm != CONTROL:
         ctrl = run_arm(CONTROL, data)

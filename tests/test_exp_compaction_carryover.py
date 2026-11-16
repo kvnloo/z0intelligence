@@ -60,6 +60,7 @@ def test_result_shape_and_verdicts(tmp_path):
     assert cand["verdict"] in {"KEEP", "DISCARD"} and set(cand["controls"]) == {"head-tail"}
     assert cand["metric"]["value"] < ctrl["metric"]["value"]
     assert "--out" not in cand["command"]  # posted publicly: no local paths
+    assert cand["command"].startswith("python3 ")  # stock Debian/macOS have no `python`
 
 
 def test_cli_writes_result(tmp_path):
