@@ -259,6 +259,23 @@ def test_reprobe_skips_blocked_backends_and_reuses_known_context(tmp_path, monke
     assert fp.alive(rows[0])  # a prober without the key never drops a working backend
 
 
+def test_a_rate_limited_size_probe_never_caps_context(tmp_path, monkeypatch):
+    # nim-step-5-preview got 429 at the 30K size probe and was capped at 6K, so the router 422'd every Hermes turn.
+    now = 1_800_000_000.0
+    hit = {"name": "nim-step-5-preview", "tool_call": True, "tool_s": 1.0, "max_ok_tokens": 6000, "ctx_30000": 429}
+    small = {"name": "groq-gpt-oss-20b", "tool_call": True, "tool_s": 1.0, "max_ok_tokens": 6000, "ctx_30000": 413}
+    assert fp.ctx_open(hit) and not fp.ctx_open(small)  # 413 is a real size limit, 429 says nothing about size
+    fp.POOL.write_text(json.dumps({"rows": [hit, small]}))
+    calls = []
+    monkeypatch.setattr(fp, "probe", lambda c, sizes=True: calls.append((c[0], sizes)) or {"name": c[0], "tool_call": True, "tool_s": 1.0})
+    fp.reprobe({}, now, cands=[c for c in fp.CANDIDATES if c[0] in ("nim-step-5-preview", "groq-gpt-oss-20b")])
+    assert ("nim-step-5-preview", True) in calls and ("groq-gpt-oss-20b", False) in calls  # re-measure only the unmeasured
+    assert not fp.ctx_open({"name": "x", "tool_call": True, "ctx_6000": 429})  # nothing measured: keep the small default
+    fp.POOL.write_text(json.dumps({"rows": [small]}))
+    rows = fp.reprobe({}, now, cands=[c for c in fp.CANDIDATES if c[0] == "groq-gpt-oss-20b"])
+    assert rows[0]["ctx_30000"] == 413  # a reused cap keeps the evidence it was measured with
+
+
 def test_pace_refuses_a_reprobe_that_kills_half_the_pool(monkeypatch):
     # 11-15 live: a prober without keys marked 36 of 43 backends dead and shrank the router to 7. Never again.
     st_file = fp.POOL.parent / "free-pace.json"

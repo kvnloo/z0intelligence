@@ -340,6 +340,11 @@ def pool_rows():
     return {}
 
 
+def ctx_open(row):
+    """The context sizing stopped on a rate limit/overload (429, 5xx), not on a size error: the cap is unmeasured."""
+    return "max_ok_tokens" in row and any(row.get(f"ctx_{n}") in TRANSIENT for n in SIZES)
+
+
 def reprobe(st, now, cands=None):
     """Tool-probe every candidate again; a bucket blocked now keeps its last row (never poll an exhausted
     provider), a known context window is reused, only new backends get the 6K/30K/100K sizing."""
@@ -349,14 +354,15 @@ def reprobe(st, now, cands=None):
     blocked = {b for b, v in st.get("blocked", {}).items() if v["until"] > now}
     todo = [c for c in cands if bucket(c[0]) not in blocked or c[0] not in old]
     with cf.ThreadPoolExecutor(8) as ex:
-        fresh = dict(zip([c[0] for c in todo], ex.map(lambda c: probe(c, sizes="max_ok_tokens" not in old.get(c[0], {})), todo)))
+        fresh = dict(zip([c[0] for c in todo], ex.map(lambda c: probe(c, sizes="max_ok_tokens" not in old.get(c[0], {})
+                                                                                        or ctx_open(old.get(c[0], {}))), todo)))
     rows = []
     for c in cands:
         r = fresh.get(c[0])
         if not r or r.get("tool_status") == "no-key":  # the prober's env lacks the key: that says nothing about the backend
             r = old.get(c[0], {"name": c[0]})
         if r.get("tool_call") and "max_ok_tokens" not in r and "max_ok_tokens" in old.get(c[0], {}):
-            r["max_ok_tokens"] = old[c[0]]["max_ok_tokens"]
+            r.update({k: v for k, v in old[c[0]].items() if k == "max_ok_tokens" or k.startswith("ctx_")})  # + evidence
         rows.append(r)
     return rows
 
@@ -390,7 +396,7 @@ def render(exclude=(), out=HERE / "config.yaml"):
         models.append({"name": name, "provider_model_id": model, "backend_refs": [backend]})
         ok = pool[name].get("max_ok_tokens", 0)
         # A probe that passed the largest size proved nothing past it: trust the published window there.
-        cap = claimed if ok == SIZES[-1] else (max(ok, 4000) if pool[name].get("tool_call") else SMALL_CAP)
+        cap = claimed if ok == SIZES[-1] or ctx_open(pool[name]) else (max(ok, 4000) if pool[name].get("tool_call") else SMALL_CAP)
         cards.append({"name": name, "context_window_size": cap})
         refs.append({"model": name, "use_reasoning": False})
     # turbo = same pool, fastest measured tool turn first (unmeasured last).
