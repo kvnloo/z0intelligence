@@ -409,6 +409,18 @@ def _sufficiency(home: Path, out: Path, cfg: Mapping, st: dict, **_: Any) -> Non
                              'pending' if harness in preregs else 'prereg_missing'}
 
 
+def _below_gate(suff: Mapping[str, Any]) -> bool:
+    """A count check (rows, not_success, groups) fails; the fold check needs the learner's own CV split."""
+    return not all(ok for name, ok in suff['checks'].items() if not name.startswith('k=='))
+
+
+def _decision(res: Path) -> str | None:
+    try:
+        return json.loads(res.read_text())['primary']['decision']
+    except (OSError, ValueError, KeyError, TypeError):
+        return None
+
+
 def _learn(home: Path, out: Path, cfg: Mapping, st: dict, *, deadline: float, **_: Any) -> None:
     todo = [k for k, s in st['strata'].items() if s['learn'] == 'pending']
     if not todo:
@@ -430,6 +442,14 @@ def _learn(home: Path, out: Path, cfg: Mapping, st: dict, *, deadline: float, **
             continue
         res = out / 'results' / st['day'] / s['harness'] / f"{s['cohort']}.json"
         res.parent.mkdir(parents=True, exist_ok=True)
+        if st['learner'].get('thresholds') and _below_gate(s['sufficiency']) and _decision(res) == 'INSUFFICIENT_DATA':
+            # The learner's own rows/not_success/groups gate fails, so its decision can only be INSUFFICIENT_DATA:
+            # keep today's full descriptive run instead of recomputing CV and bootstrap every tick.
+            s['learn'] = 'INSUFFICIENT_DATA'
+            st['results'][key] = {'decision': 'INSUFFICIENT_DATA', 'prereg': s['prereg'], 'pregate': True,
+                                  'learner_sha': st['learner']['sha'], 'result': os.path.relpath(res, home),
+                                  'table_manifest_sha256': (st['index']['tables'][key] or {}).get('manifest_sha256')}
+            continue
         table = out / 'tables' / s['harness'] / f"{s['cohort']}.jsonl"
         try:
             p = subprocess.run([python, '-m', 'evolution_lab.verified_loop', '--table', str(table), '--out', str(res),

@@ -439,6 +439,27 @@ def test_sufficiency_uses_the_pinned_learners_thresholds_and_flags_a_mismatch(wo
         assert s['sufficiency']['thresholds_source'] == 'learner'
 
 
+def test_a_stratum_below_the_learners_own_gate_is_learned_once_a_day_then_reused(world, learner):
+    repin_learner(world, learner, 'MIN_ROWS = 300\nMIN_NEG = 30\nMIN_GROUPS = 10\nK = 5')
+    cc_opportunities(world.home)
+    first = tick(world)
+    assert len(learner.calls()) == 1 and first['strata']['claude-code/unknown']['learn'] == 'INSUFFICIENT_DATA'
+    second = tick(world)
+    assert len(learner.calls()) == 1  # the decision is forced by the learner's own thresholds: not recomputed
+    assert second['strata']['claude-code/unknown']['learn'] == 'INSUFFICIENT_DATA'
+    r = second['results']['claude-code/unknown']
+    assert r['decision'] == 'INSUFFICIENT_DATA' and r['pregate'] is True
+    assert r['result'] == first['results']['claude-code/unknown']['result']
+
+
+def test_a_stratum_that_passes_the_cheap_gate_is_learned_every_tick(world, learner):
+    repin_learner(world, learner, 'MIN_ROWS = 0\nMIN_NEG = 0\nMIN_GROUPS = 0\nK = 5')
+    cc_opportunities(world.home)
+    tick(world)
+    tick(world)
+    assert len(learner.calls()) == 2
+
+
 def test_a_learner_with_the_preregistered_thresholds_reports_no_mismatch(world, learner):
     repin_learner(world, learner, 'MIN_ROWS = 300\nMIN_NEG = 30\nMIN_GROUPS = 10\nK = 5')
     cc_opportunities(world.home)
