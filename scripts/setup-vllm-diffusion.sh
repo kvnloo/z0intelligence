@@ -28,7 +28,7 @@ if [[ ! -d "$VENV" ]]; then
 fi
 # shellcheck disable=SC1091
 source "$VENV/bin/activate"
-pip install -q -e '.[test]'
+pip install -q -e '.[test,ml]'
 
 if [[ ! -d "$VLLM_DIR/.git" ]]; then
   banner "Clone vLLM"

@@ -6,23 +6,25 @@ The full design is in [docs/contrib/CONTRIBUTOR-LAYER.md](docs/contrib/CONTRIBUT
 
 ## 1. Set up
 
-Recommended (full path, installs the runtime and the harness plugins):
-
-```bash
-git clone https://github.com/kvnloo/z0 && ./z0/z0 onboard --auto
-```
-
-Repo only (degraded path; tasks that need the full runtime are not offered):
+Python 3.10–3.13. The core install has no torch, so it works anywhere,
+including Intel Macs:
 
 ```bash
 git clone https://github.com/<you>/z0intelligence && cd z0intelligence
-./scripts/bootstrap.sh            # or: python -m venv .venv && .venv/bin/pip install -e '.[test]'
+./scripts/bootstrap.sh            # light .venv; or: python -m venv .venv && .venv/bin/pip install -e '.[test]'
 ```
+
+Tests that need the ML stack skip themselves without it. If your task touches
+models or backends, add the `ml` extra: `Z0INT_EXTRAS=test,ml ./scripts/bootstrap.sh`
+(on Linux, `pip install torch==2.10.0+cpu --index-url https://download.pytorch.org/whl/cpu`
+first keeps it small). The full Zer0 runtime and harness plugins come from
+`git clone https://github.com/kvnloo/z0 && ./z0/z0 onboard --auto`; tasks that need
+it are not offered on the repo-only path.
 
 Then run:
 
 ```bash
-z0int contribute
+.venv/bin/z0int contribute
 ```
 
 It checks your setup, runs an offline smoke eval (CPU only, no model downloads),
@@ -73,13 +75,19 @@ z0int contribute pr <task-id> --open --yes    # pushes to YOUR fork, opens a DRA
 - The PR body holds the task id, the receipts, your hardware class (for example
   `nvidia-12g`), harness and model, and a `Credit: @you` line. It never holds your
   profile or anything from your home directory.
+- The `receipt` check reads the yaml block in the PR body. `head_revision` must be
+  the PR head (`git rev-parse HEAD`), so update it after every push; editing the
+  description re-runs the check.
+- Until you have had a PR merged here, CI waits for a maintainer to approve each
+  workflow run. "Waiting for approval" means nobody has approved it yet; nothing is
+  wrong with your PR.
 
-## 5. Contributor License Agreement (CLA)
+## 5. Terms: no Contributor License Agreement
 
-Contributions are accepted under the z0intelligence **Contributor License
-Agreement**. A CLA bot checks every pull request: on your first PR it posts a
-link to the agreement and asks you to sign it once. A PR cannot be merged until
-the CLA check passes.
+z0intelligence is MIT-licensed and needs no Contributor License Agreement and no
+CLA bot: what you contribute is licensed to everyone under the same MIT license
+(inbound = outbound, GitHub Terms of Service D.6). Only contribute work you have
+the right to license that way.
 
 ## 6. Credit
 

@@ -146,6 +146,14 @@ def _amt(x: float | None, unit: str) -> str:
 # ---------------------------------------------------------------------------
 
 
+OBSERVATION_PREDATES_RESET = "observation_predates_reset"
+
+
+def observation_predates_reset(reset: datetime | None, now: datetime) -> bool:
+    """True once a quota window's reset has passed: what was observed before it no longer says what remains."""
+    return reset is not None and reset <= now
+
+
 def evaluate_pool(pool: Pool, now: datetime, th: Thresholds = Thresholds()) -> dict[str, Any]:
     """Posture for one pool, with every number that produced it."""
     reset = parse_time(pool.resets_at)
@@ -171,10 +179,10 @@ def evaluate_pool(pool: Pool, now: datetime, th: Thresholds = Thresholds()) -> d
     unit = pool.unit
     if pool.remaining is None:
         return done("BALANCED", "unmetered: no perishable quota observed", "unmetered_capacity")
-    if reset is not None and hours_left is not None and hours_left <= 0:
+    if observation_predates_reset(reset, now):
         out["confidence"] = "stale"
         return done("BALANCED", f"observation predates reset at {pool.resets_at}; current remaining unknown",
-                    "observation_predates_reset")
+                    OBSERVATION_PREDATES_RESET)
     if pool.remaining <= 0:
         return done("OFFLOAD", f"remaining {_amt(pool.remaining, unit)} = exhausted"
                     + (f" for {_hours(hours_left)} until reset" if hours_left is not None else ""), "exhausted")

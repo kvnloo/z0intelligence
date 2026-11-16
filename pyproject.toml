@@ -14,14 +14,7 @@ dependencies = [
   "typesafe-sdk==0.7.2",
   "mcp==1.26.0",
   "tomli==2.2.1; python_version < '3.11'",
-  "torch==2.10.0",
-  "transformers==5.17.0",
-  "accelerate==1.12.0",
-  "safetensors==0.8.0",
-  "huggingface-hub==1.31.0",
-  "tokenizers==0.23.2",
   "numpy==2.2.6",
-  "sentencepiece==0.2.1",
   "protobuf==7.36.1",
   "aodl-contract @ git+https://github.com/kvnloo/aodl.git@68231658f0ec0338464c0916a2329b9587444312",
 ]
@@ -38,6 +31,8 @@ z0int-compile = "z0int.compile:main"
 z0int-train-next-action = "z0int.train:main"
 z0int-image-decide = "z0int.image_decision_cli:main"
 [project.optional-dependencies]
+# ML stack is optional so docs/test-only contributors (incl. Intel Macs, no torch 2.10 wheel) can install.
+ml = ["torch==2.10.0", "transformers==5.17.0", "accelerate==1.12.0", "safetensors==0.8.0", "huggingface-hub==1.31.0", "tokenizers==0.23.2", "sentencepiece==0.2.1"]
 test = ["pytest==8.4.2", "PyYAML==6.0.3", "agent-tokenomics @ git+https://github.com/kvnloo/tokenomics.git@2ae90511a900fdb3dcc576c9634cd8d9ee1c8d6a"]
 analytics = ["agent-tokenomics @ git+https://github.com/kvnloo/tokenomics.git@2ae90511a900fdb3dcc576c9634cd8d9ee1c8d6a"]
 image = ["pillow>=11", "torchvision"]

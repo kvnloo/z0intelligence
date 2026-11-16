@@ -12,7 +12,6 @@ At import this module loads stdlib + ``harness_capture`` / ``harness_id`` only. 
 build runs in a detached child (internal event ``opportunity``) that holds one of a bounded set of slots.
 """
 
-import argparse
 import json
 import os
 import sys
@@ -116,15 +115,33 @@ def handle(event, raw, harness=None, *, env=None):
     return None
 
 
+def _fast_args(argv):
+    """(event, harness) for the two shapes every shim sends, else None so argparse handles help and errors.
+    Building the argparse parser costs ~10 ms per hook call (more on 3.14), so the hot path skips it."""
+    harness, rest = (argv[1], argv[2:]) if len(argv) == 3 and argv[0] == '--harness' else (None, argv)
+    if len(rest) == 1 and (rest[0] in EVENTS or rest[0] == 'opportunity'):
+        return rest[0], harness
+    return None
+
+
 def main(argv=None):
+    argv = sys.argv[1:] if argv is None else list(argv)
+    fast = _fast_args(argv)
+    if fast is not None:
+        return _run(*fast)
+    import argparse
     ap = argparse.ArgumentParser(prog='python -m z0int.hook_adapter', description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('--harness', default=None, help='harness id; default: from the payload and runner env')
     ap.add_argument('event', choices=[*EVENTS, 'opportunity'])
     args = ap.parse_args(argv)
+    return _run(args.event, args.harness)
+
+
+def _run(event, harness):
     raw = sys.stdin.read()
     try:
-        out = handle(args.event, raw, args.harness)
+        out = handle(event, raw, harness)
     except Exception:
         out = None  # a hook failure must never block or alter the native turn
     if out:

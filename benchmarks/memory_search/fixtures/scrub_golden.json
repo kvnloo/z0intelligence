@@ -1,0 +1,1102 @@
+[
+  {
+    "text": "lexical quokka scrub tether ledger scrub temporal sk-FAKEFAKEFAKEFAKEFAKEFAKE router capsule gateway",
+    "scrubbed": "lexical quokka scrub tether ledger scrub temporal [redacted:credential] router capsule gateway",
+    "count": 1
+  },
+  {
+    "text": "gateway router coral lattice",
+    "scrubbed": "gateway router coral lattice",
+    "count": 0
+  },
+  {
+    "text": "orbit claim scrub brief lexical quokka courier prism",
+    "scrubbed": "orbit claim scrub brief lexical quokka courier prism",
+    "count": 0
+  },
+  {
+    "text": "kernel relay orbit kernel ember",
+    "scrubbed": "kernel relay orbit kernel ember",
+    "count": 0
+  },
+  {
+    "text": "scrub courier tether ledger cache vault kernel vector lattice",
+    "scrubbed": "scrub courier tether ledger cache vault kernel vector lattice",
+    "count": 0
+  },
+  {
+    "text": "cache capsule policy orbit anchor gateway",
+    "scrubbed": "cache capsule policy orbit anchor gateway",
+    "count": 0
+  },
+  {
+    "text": "kernel quokka profile claim lattice shard receipt bridge",
+    "scrubbed": "kernel quokka profile claim lattice shard receipt bridge",
+    "count": 0
+  },
+  {
+    "text": "tether prism receipt kernel",
+    "scrubbed": "tether prism receipt kernel",
+    "count": 0
+  },
+  {
+    "text": "harness claim gateway router lexical anchor claim vector",
+    "scrubbed": "harness claim gateway router lexical anchor claim vector",
+    "count": 0
+  },
+  {
+    "text": "ledger queue cache ledger brief cache claim",
+    "scrubbed": "ledger queue cache ledger brief cache claim",
+    "count": 0
+  },
+  {
+    "text": "claim orbit ledger drift shard router",
+    "scrubbed": "claim orbit ledger drift shard router",
+    "count": 0
+  },
+  {
+    "text": "profile tether orbit lattice ledger lattice ember",
+    "scrubbed": "profile tether orbit lattice ledger lattice ember",
+    "count": 0
+  },
+  {
+    "text": "beacon anchor beacon index cache",
+    "scrubbed": "beacon anchor beacon index cache",
+    "count": 0
+  },
+  {
+    "text": "brief queue signal lexical",
+    "scrubbed": "brief queue signal lexical",
+    "count": 0
+  },
+  {
+    "text": "temporal prism shard token policy router temporal receipt",
+    "scrubbed": "temporal prism shard token policy router temporal receipt",
+    "count": 0
+  },
+  {
+    "text": "cache claim manifest beacon kernel scrub replica harness",
+    "scrubbed": "cache claim manifest beacon kernel scrub replica harness",
+    "count": 0
+  },
+  {
+    "text": "index ledger worker courier",
+    "scrubbed": "index ledger worker courier",
+    "count": 0
+  },
+  {
+    "text": "manifest vector orbit kernel api_key: FakeApiKeyValue1234567890 tether token kernel",
+    "scrubbed": "manifest vector orbit kernel [redacted:credential] tether token kernel",
+    "count": 1
+  },
+  {
+    "text": "signal policy temporal replica policy orbit courier capsule cluster",
+    "scrubbed": "signal policy temporal replica policy orbit courier capsule cluster",
+    "count": 0
+  },
+  {
+    "text": "courier queue brief tether harness",
+    "scrubbed": "courier queue brief tether harness",
+    "count": 0
+  },
+  {
+    "text": "bridge router relay claim prism vault",
+    "scrubbed": "bridge router relay claim prism vault",
+    "count": 0
+  },
+  {
+    "text": "profile snapshot snapshot bridge coral receipt claim",
+    "scrubbed": "profile snapshot snapshot bridge coral receipt claim",
+    "count": 0
+  },
+  {
+    "text": "kernel manifest receipt quokka bridge scrub claim harness",
+    "scrubbed": "kernel manifest receipt quokka bridge scrub claim harness",
+    "count": 0
+  },
+  {
+    "text": "signal replica manifest harness",
+    "scrubbed": "signal replica manifest harness",
+    "count": 0
+  },
+  {
+    "text": "shard cache relay vector signal manifest drift claim relay",
+    "scrubbed": "shard cache relay vector signal manifest drift claim relay",
+    "count": 0
+  },
+  {
+    "text": "token cache queue replica",
+    "scrubbed": "token cache queue replica",
+    "count": 0
+  },
+  {
+    "text": "cache anchor lexical shard cache harness vector tether",
+    "scrubbed": "cache anchor lexical shard cache harness vector tether",
+    "count": 0
+  },
+  {
+    "text": "bridge router beacon worker prism receipt shard",
+    "scrubbed": "bridge router beacon worker prism receipt shard",
+    "count": 0
+  },
+  {
+    "text": "quokka kernel lattice replica vector signal",
+    "scrubbed": "quokka kernel lattice replica vector signal",
+    "count": 0
+  },
+  {
+    "text": "lattice brief replica lattice receipt index tether cluster ember",
+    "scrubbed": "lattice brief replica lattice receipt index tether cluster ember",
+    "count": 0
+  },
+  {
+    "text": "harness receipt anchor drift orbit lattice",
+    "scrubbed": "harness receipt anchor drift orbit lattice",
+    "count": 0
+  },
+  {
+    "text": "gateway orbit temporal gateway cluster lattice kernel snapshot tether",
+    "scrubbed": "gateway orbit temporal gateway cluster lattice kernel snapshot tether",
+    "count": 0
+  },
+  {
+    "text": "router index vector tether profile drift",
+    "scrubbed": "router index vector tether profile drift",
+    "count": 0
+  },
+  {
+    "text": "drift policy courier cache kernel relay",
+    "scrubbed": "drift policy courier cache kernel relay",
+    "count": 0
+  },
+  {
+    "text": "ember harness profile courier profile manifest orbit cache scrub Bearer fakebearerxxxxxxxxxxxxxxxxxxxx anchor tether tether",
+    "scrubbed": "ember harness profile courier profile manifest orbit cache scrub [redacted:credential] anchor tether tether",
+    "count": 1
+  },
+  {
+    "text": "lexical capsule token cluster snapshot gateway replica ledger",
+    "scrubbed": "lexical capsule token cluster snapshot gateway replica ledger",
+    "count": 0
+  },
+  {
+    "text": "ledger harness claim manifest anchor router signal courier kernel",
+    "scrubbed": "ledger harness claim manifest anchor router signal courier kernel",
+    "count": 0
+  },
+  {
+    "text": "token prism tether worker router courier",
+    "scrubbed": "token prism tether worker router courier",
+    "count": 0
+  },
+  {
+    "text": "gateway tether profile drift",
+    "scrubbed": "gateway tether profile drift",
+    "count": 0
+  },
+  {
+    "text": "receipt lattice prism snapshot relay",
+    "scrubbed": "receipt lattice prism snapshot relay",
+    "count": 0
+  },
+  {
+    "text": "coral kernel claim relay capsule receipt courier courier",
+    "scrubbed": "coral kernel claim relay capsule receipt courier courier",
+    "count": 0
+  },
+  {
+    "text": "replica manifest snapshot vault drift relay coral ember beacon",
+    "scrubbed": "replica manifest snapshot vault drift relay coral ember beacon",
+    "count": 0
+  },
+  {
+    "text": "cluster kernel cluster queue",
+    "scrubbed": "cluster kernel cluster queue",
+    "count": 0
+  },
+  {
+    "text": "ember coral kernel manifest",
+    "scrubbed": "ember coral kernel manifest",
+    "count": 0
+  },
+  {
+    "text": "coral policy router anchor shard",
+    "scrubbed": "coral policy router anchor shard",
+    "count": 0
+  },
+  {
+    "text": "prism bridge gateway beacon scrub index signal profile",
+    "scrubbed": "prism bridge gateway beacon scrub index signal profile",
+    "count": 0
+  },
+  {
+    "text": "prism capsule gateway router tether",
+    "scrubbed": "prism capsule gateway router tether",
+    "count": 0
+  },
+  {
+    "text": "queue brief kernel gateway harness policy",
+    "scrubbed": "queue brief kernel gateway harness policy",
+    "count": 0
+  },
+  {
+    "text": "coral vault claim courier snapshot token bridge ember",
+    "scrubbed": "coral vault claim courier snapshot token bridge ember",
+    "count": 0
+  },
+  {
+    "text": "cluster ember cluster index replica queue cluster",
+    "scrubbed": "cluster ember cluster index replica queue cluster",
+    "count": 0
+  },
+  {
+    "text": "index quokka manifest tether cache",
+    "scrubbed": "index quokka manifest tether cache",
+    "count": 0
+  },
+  {
+    "text": "relay ember ledger harness xai-F4K3TOKENVALUE0000000000 relay drift tether",
+    "scrubbed": "relay ember ledger harness [redacted:credential] relay drift tether",
+    "count": 1
+  },
+  {
+    "text": "relay brief manifest index cluster cache",
+    "scrubbed": "relay brief manifest index cluster cache",
+    "count": 0
+  },
+  {
+    "text": "brief orbit receipt quokka relay queue capsule policy beacon",
+    "scrubbed": "brief orbit receipt quokka relay queue capsule policy beacon",
+    "count": 0
+  },
+  {
+    "text": "brief router tether queue anchor prism",
+    "scrubbed": "brief router tether queue anchor prism",
+    "count": 0
+  },
+  {
+    "text": "tether lattice lattice courier beacon cluster coral temporal",
+    "scrubbed": "tether lattice lattice courier beacon cluster coral temporal",
+    "count": 0
+  },
+  {
+    "text": "anchor replica tether snapshot temporal lattice prism temporal relay",
+    "scrubbed": "anchor replica tether snapshot temporal lattice prism temporal relay",
+    "count": 0
+  },
+  {
+    "text": "snapshot token capsule kernel profile replica index anchor",
+    "scrubbed": "snapshot token capsule kernel profile replica index anchor",
+    "count": 0
+  },
+  {
+    "text": "replica vault policy ember lattice orbit",
+    "scrubbed": "replica vault policy ember lattice orbit",
+    "count": 0
+  },
+  {
+    "text": "beacon anchor temporal relay orbit scrub",
+    "scrubbed": "beacon anchor temporal relay orbit scrub",
+    "count": 0
+  },
+  {
+    "text": "policy brief ember profile",
+    "scrubbed": "policy brief ember profile",
+    "count": 0
+  },
+  {
+    "text": "shard cache policy token gateway",
+    "scrubbed": "shard cache policy token gateway",
+    "count": 0
+  },
+  {
+    "text": "manifest ember temporal ledger bridge",
+    "scrubbed": "manifest ember temporal ledger bridge",
+    "count": 0
+  },
+  {
+    "text": "token signal manifest profile vector tether signal drift receipt",
+    "scrubbed": "token signal manifest profile vector tether signal drift receipt",
+    "count": 0
+  },
+  {
+    "text": "replica quokka index ember ember index manifest",
+    "scrubbed": "replica quokka index ember ember index manifest",
+    "count": 0
+  },
+  {
+    "text": "capsule claim policy coral beacon ember beacon queue",
+    "scrubbed": "capsule claim policy coral beacon ember beacon queue",
+    "count": 0
+  },
+  {
+    "text": "profile anchor cache signal replica token drift prism",
+    "scrubbed": "profile anchor cache signal replica token drift prism",
+    "count": 0
+  },
+  {
+    "text": "capsule index receipt receipt queue receipt",
+    "scrubbed": "capsule index receipt receipt queue receipt",
+    "count": 0
+  },
+  {
+    "text": "worker drift relay router ghp_F4K3F4K3F4K3F4K3F4K3 relay harness signal",
+    "scrubbed": "worker drift relay router [redacted:credential] relay harness signal",
+    "count": 1
+  },
+  {
+    "text": "gateway vault replica kernel kernel kernel capsule",
+    "scrubbed": "gateway vault replica kernel kernel kernel capsule",
+    "count": 0
+  },
+  {
+    "text": "shard prism shard capsule vector courier manifest anchor anchor",
+    "scrubbed": "shard prism shard capsule vector courier manifest anchor anchor",
+    "count": 0
+  },
+  {
+    "text": "kernel vector gateway courier brief claim claim",
+    "scrubbed": "kernel vector gateway courier brief claim claim",
+    "count": 0
+  },
+  {
+    "text": "signal brief anchor snapshot vector temporal prism",
+    "scrubbed": "signal brief anchor snapshot vector temporal prism",
+    "count": 0
+  },
+  {
+    "text": "profile ember snapshot cache signal lattice cache manifest",
+    "scrubbed": "profile ember snapshot cache signal lattice cache manifest",
+    "count": 0
+  },
+  {
+    "text": "kernel beacon worker beacon capsule",
+    "scrubbed": "kernel beacon worker beacon capsule",
+    "count": 0
+  },
+  {
+    "text": "cache claim vault cache",
+    "scrubbed": "cache claim vault cache",
+    "count": 0
+  },
+  {
+    "text": "replica harness policy vault anchor",
+    "scrubbed": "replica harness policy vault anchor",
+    "count": 0
+  },
+  {
+    "text": "harness profile coral queue quokka",
+    "scrubbed": "harness profile coral queue quokka",
+    "count": 0
+  },
+  {
+    "text": "router policy worker vault gateway gateway cluster beacon",
+    "scrubbed": "router policy worker vault gateway gateway cluster beacon",
+    "count": 0
+  },
+  {
+    "text": "quokka queue signal prism queue",
+    "scrubbed": "quokka queue signal prism queue",
+    "count": 0
+  },
+  {
+    "text": "tether anchor capsule tether drift drift",
+    "scrubbed": "tether anchor capsule tether drift drift",
+    "count": 0
+  },
+  {
+    "text": "vector lattice tether gateway gateway index drift",
+    "scrubbed": "vector lattice tether gateway gateway index drift",
+    "count": 0
+  },
+  {
+    "text": "beacon drift capsule replica",
+    "scrubbed": "beacon drift capsule replica",
+    "count": 0
+  },
+  {
+    "text": "harness ledger signal replica lexical queue brief",
+    "scrubbed": "harness ledger signal replica lexical queue brief",
+    "count": 0
+  },
+  {
+    "text": "coral kernel cluster receipt worker",
+    "scrubbed": "coral kernel cluster receipt worker",
+    "count": 0
+  },
+  {
+    "text": "courier shard ledger snapshot AKIAFAKEFAKEFAKEFAKE cache courier gateway",
+    "scrubbed": "courier shard ledger snapshot [redacted:credential] cache courier gateway",
+    "count": 1
+  },
+  {
+    "text": "courier bridge cache anchor gateway ledger",
+    "scrubbed": "courier bridge cache anchor gateway ledger",
+    "count": 0
+  },
+  {
+    "text": "lattice gateway index brief worker coral prism",
+    "scrubbed": "lattice gateway index brief worker coral prism",
+    "count": 0
+  },
+  {
+    "text": "bridge index capsule beacon orbit brief token receipt",
+    "scrubbed": "bridge index capsule beacon orbit brief token receipt",
+    "count": 0
+  },
+  {
+    "text": "vector anchor quokka index manifest ember harness",
+    "scrubbed": "vector anchor quokka index manifest ember harness",
+    "count": 0
+  },
+  {
+    "text": "ledger vector ember prism gateway",
+    "scrubbed": "ledger vector ember prism gateway",
+    "count": 0
+  },
+  {
+    "text": "receipt signal profile coral index temporal scrub",
+    "scrubbed": "receipt signal profile coral index temporal scrub",
+    "count": 0
+  },
+  {
+    "text": "queue drift profile anchor ember ledger queue beacon",
+    "scrubbed": "queue drift profile anchor ember ledger queue beacon",
+    "count": 0
+  },
+  {
+    "text": "brief replica temporal vault anchor profile tether anchor",
+    "scrubbed": "brief replica temporal vault anchor profile tether anchor",
+    "count": 0
+  },
+  {
+    "text": "policy anchor temporal replica scrub manifest courier snapshot",
+    "scrubbed": "policy anchor temporal replica scrub manifest courier snapshot",
+    "count": 0
+  },
+  {
+    "text": "kernel profile coral lattice token kernel kernel ember beacon",
+    "scrubbed": "kernel profile coral lattice token kernel kernel ember beacon",
+    "count": 0
+  },
+  {
+    "text": "quokka router ledger tether coral harness temporal beacon",
+    "scrubbed": "quokka router ledger tether coral harness temporal beacon",
+    "count": 0
+  },
+  {
+    "text": "vault brief drift ledger cache courier tether replica vector",
+    "scrubbed": "vault brief drift ledger cache courier tether replica vector",
+    "count": 0
+  },
+  {
+    "text": "coral ledger drift profile relay profile harness scrub",
+    "scrubbed": "coral ledger drift profile relay profile harness scrub",
+    "count": 0
+  },
+  {
+    "text": "capsule temporal vector gateway kernel scrub gateway vector",
+    "scrubbed": "capsule temporal vector gateway kernel scrub gateway vector",
+    "count": 0
+  },
+  {
+    "text": "coral router coral signal coral gateway replica orbit",
+    "scrubbed": "coral router coral signal coral gateway replica orbit",
+    "count": 0
+  },
+  {
+    "text": "harness scrub router profile",
+    "scrubbed": "harness scrub router profile",
+    "count": 0
+  },
+  {
+    "text": "shard router temporal gateway snapshot snapshot sk-FAKEFAKEFAKEFAKEFAKEFAKE beacon router snapshot",
+    "scrubbed": "shard router temporal gateway snapshot snapshot [redacted:credential] beacon router snapshot",
+    "count": 1
+  },
+  {
+    "text": "bridge cache drift receipt",
+    "scrubbed": "bridge cache drift receipt",
+    "count": 0
+  },
+  {
+    "text": "coral profile vault coral",
+    "scrubbed": "coral profile vault coral",
+    "count": 0
+  },
+  {
+    "text": "ember scrub courier signal cluster gateway queue",
+    "scrubbed": "ember scrub courier signal cluster gateway queue",
+    "count": 0
+  },
+  {
+    "text": "policy relay receipt coral drift worker",
+    "scrubbed": "policy relay receipt coral drift worker",
+    "count": 0
+  },
+  {
+    "text": "signal receipt signal prism snapshot shard courier lattice drift",
+    "scrubbed": "signal receipt signal prism snapshot shard courier lattice drift",
+    "count": 0
+  },
+  {
+    "text": "vector drift cache token claim router snapshot",
+    "scrubbed": "vector drift cache token claim router snapshot",
+    "count": 0
+  },
+  {
+    "text": "token coral vector capsule index receipt claim ember tether",
+    "scrubbed": "token coral vector capsule index receipt claim ember tether",
+    "count": 0
+  },
+  {
+    "text": "orbit bridge token queue cluster bridge router quokka courier",
+    "scrubbed": "orbit bridge token queue cluster bridge router quokka courier",
+    "count": 0
+  },
+  {
+    "text": "policy coral vector policy",
+    "scrubbed": "policy coral vector policy",
+    "count": 0
+  },
+  {
+    "text": "shard index manifest vault shard queue cache",
+    "scrubbed": "shard index manifest vault shard queue cache",
+    "count": 0
+  },
+  {
+    "text": "anchor bridge ember coral profile token policy",
+    "scrubbed": "anchor bridge ember coral profile token policy",
+    "count": 0
+  },
+  {
+    "text": "temporal replica coral cluster cluster signal",
+    "scrubbed": "temporal replica coral cluster cluster signal",
+    "count": 0
+  },
+  {
+    "text": "shard queue index token ember receipt",
+    "scrubbed": "shard queue index token ember receipt",
+    "count": 0
+  },
+  {
+    "text": "drift router policy courier brief bridge shard",
+    "scrubbed": "drift router policy courier brief bridge shard",
+    "count": 0
+  },
+  {
+    "text": "orbit tether snapshot capsule shard vector cluster queue",
+    "scrubbed": "orbit tether snapshot capsule shard vector cluster queue",
+    "count": 0
+  },
+  {
+    "text": "token worker manifest vault beacon manifest lexical receipt",
+    "scrubbed": "token worker manifest vault beacon manifest lexical receipt",
+    "count": 0
+  },
+  {
+    "text": "vault token brief replica beacon token cache beacon scrub api_key: FakeApiKeyValue1234567890 receipt anchor orbit",
+    "scrubbed": "vault token brief replica beacon token cache beacon scrub [redacted:credential] receipt anchor orbit",
+    "count": 1
+  },
+  {
+    "text": "bridge bridge vector harness shard snapshot queue",
+    "scrubbed": "bridge bridge vector harness shard snapshot queue",
+    "count": 0
+  },
+  {
+    "text": "tether kernel policy claim index cluster index brief",
+    "scrubbed": "tether kernel policy claim index cluster index brief",
+    "count": 0
+  },
+  {
+    "text": "relay signal lattice bridge capsule drift tether lattice",
+    "scrubbed": "relay signal lattice bridge capsule drift tether lattice",
+    "count": 0
+  },
+  {
+    "text": "temporal receipt ember bridge lexical temporal claim",
+    "scrubbed": "temporal receipt ember bridge lexical temporal claim",
+    "count": 0
+  },
+  {
+    "text": "lexical lattice cluster temporal vault",
+    "scrubbed": "lexical lattice cluster temporal vault",
+    "count": 0
+  },
+  {
+    "text": "scrub harness snapshot manifest",
+    "scrubbed": "scrub harness snapshot manifest",
+    "count": 0
+  },
+  {
+    "text": "token coral signal index cluster beacon worker",
+    "scrubbed": "token coral signal index cluster beacon worker",
+    "count": 0
+  },
+  {
+    "text": "manifest bridge harness vector",
+    "scrubbed": "manifest bridge harness vector",
+    "count": 0
+  },
+  {
+    "text": "replica anchor cluster anchor prism vector token receipt brief",
+    "scrubbed": "replica anchor cluster anchor prism vector token receipt brief",
+    "count": 0
+  },
+  {
+    "text": "ember gateway ledger profile courier profile",
+    "scrubbed": "ember gateway ledger profile courier profile",
+    "count": 0
+  },
+  {
+    "text": "cluster orbit lexical signal scrub index queue anchor",
+    "scrubbed": "cluster orbit lexical signal scrub index queue anchor",
+    "count": 0
+  },
+  {
+    "text": "manifest snapshot replica cache",
+    "scrubbed": "manifest snapshot replica cache",
+    "count": 0
+  },
+  {
+    "text": "ledger shard quokka queue gateway worker anchor",
+    "scrubbed": "ledger shard quokka queue gateway worker anchor",
+    "count": 0
+  },
+  {
+    "text": "vault kernel tether kernel anchor cluster cluster prism",
+    "scrubbed": "vault kernel tether kernel anchor cluster cluster prism",
+    "count": 0
+  },
+  {
+    "text": "bridge quokka gateway coral",
+    "scrubbed": "bridge quokka gateway coral",
+    "count": 0
+  },
+  {
+    "text": "worker tether lexical shard cache courier vault worker",
+    "scrubbed": "worker tether lexical shard cache courier vault worker",
+    "count": 0
+  },
+  {
+    "text": "vector kernel kernel coral index profile Bearer fakebearerxxxxxxxxxxxxxxxxxxxx profile signal lattice",
+    "scrubbed": "vector kernel kernel coral index profile [redacted:credential] profile signal lattice",
+    "count": 1
+  },
+  {
+    "text": "ledger orbit queue relay manifest harness harness policy cache",
+    "scrubbed": "ledger orbit queue relay manifest harness harness policy cache",
+    "count": 0
+  },
+  {
+    "text": "queue anchor gateway orbit",
+    "scrubbed": "queue anchor gateway orbit",
+    "count": 0
+  },
+  {
+    "text": "cache signal quokka tether",
+    "scrubbed": "cache signal quokka tether",
+    "count": 0
+  },
+  {
+    "text": "ember ember queue signal",
+    "scrubbed": "ember ember queue signal",
+    "count": 0
+  },
+  {
+    "text": "scrub beacon capsule tether ledger",
+    "scrubbed": "scrub beacon capsule tether ledger",
+    "count": 0
+  },
+  {
+    "text": "temporal token quokka harness ember",
+    "scrubbed": "temporal token quokka harness ember",
+    "count": 0
+  },
+  {
+    "text": "shard vault gateway policy claim temporal profile",
+    "scrubbed": "shard vault gateway policy claim temporal profile",
+    "count": 0
+  },
+  {
+    "text": "relay scrub scrub lexical",
+    "scrubbed": "relay scrub scrub lexical",
+    "count": 0
+  },
+  {
+    "text": "ledger policy replica replica policy profile tether",
+    "scrubbed": "ledger policy replica replica policy profile tether",
+    "count": 0
+  },
+  {
+    "text": "bridge bridge queue relay queue beacon",
+    "scrubbed": "bridge bridge queue relay queue beacon",
+    "count": 0
+  },
+  {
+    "text": "worker beacon tether beacon courier cluster courier drift manifest",
+    "scrubbed": "worker beacon tether beacon courier cluster courier drift manifest",
+    "count": 0
+  },
+  {
+    "text": "drift index prism lexical courier cache prism cluster orbit",
+    "scrubbed": "drift index prism lexical courier cache prism cluster orbit",
+    "count": 0
+  },
+  {
+    "text": "temporal claim brief temporal cache queue",
+    "scrubbed": "temporal claim brief temporal cache queue",
+    "count": 0
+  },
+  {
+    "text": "orbit courier tether tether cache cache",
+    "scrubbed": "orbit courier tether tether cache cache",
+    "count": 0
+  },
+  {
+    "text": "vault tether vault ledger",
+    "scrubbed": "vault tether vault ledger",
+    "count": 0
+  },
+  {
+    "text": "manifest beacon anchor temporal relay bridge capsule",
+    "scrubbed": "manifest beacon anchor temporal relay bridge capsule",
+    "count": 0
+  },
+  {
+    "text": "harness scrub temporal replica xai-F4K3TOKENVALUE0000000000 replica cluster profile",
+    "scrubbed": "harness scrub temporal replica [redacted:credential] replica cluster profile",
+    "count": 1
+  },
+  {
+    "text": "cache policy ember relay",
+    "scrubbed": "cache policy ember relay",
+    "count": 0
+  },
+  {
+    "text": "router cluster cache courier lattice",
+    "scrubbed": "router cluster cache courier lattice",
+    "count": 0
+  },
+  {
+    "text": "anchor orbit ledger signal",
+    "scrubbed": "anchor orbit ledger signal",
+    "count": 0
+  },
+  {
+    "text": "policy lexical vector brief",
+    "scrubbed": "policy lexical vector brief",
+    "count": 0
+  },
+  {
+    "text": "anchor signal ember receipt index prism",
+    "scrubbed": "anchor signal ember receipt index prism",
+    "count": 0
+  },
+  {
+    "text": "courier kernel policy profile",
+    "scrubbed": "courier kernel policy profile",
+    "count": 0
+  },
+  {
+    "text": "temporal orbit tether lexical prism prism replica",
+    "scrubbed": "temporal orbit tether lexical prism prism replica",
+    "count": 0
+  },
+  {
+    "text": "index index kernel queue worker ledger anchor anchor courier",
+    "scrubbed": "index index kernel queue worker ledger anchor anchor courier",
+    "count": 0
+  },
+  {
+    "text": "claim prism token prism anchor manifest",
+    "scrubbed": "claim prism token prism anchor manifest",
+    "count": 0
+  },
+  {
+    "text": "capsule beacon anchor relay temporal",
+    "scrubbed": "capsule beacon anchor relay temporal",
+    "count": 0
+  },
+  {
+    "text": "lexical scrub policy bridge tether shard vector",
+    "scrubbed": "lexical scrub policy bridge tether shard vector",
+    "count": 0
+  },
+  {
+    "text": "replica brief policy policy snapshot",
+    "scrubbed": "replica brief policy policy snapshot",
+    "count": 0
+  },
+  {
+    "text": "lexical quokka vector cache anchor",
+    "scrubbed": "lexical quokka vector cache anchor",
+    "count": 0
+  },
+  {
+    "text": "snapshot bridge drift coral index",
+    "scrubbed": "snapshot bridge drift coral index",
+    "count": 0
+  },
+  {
+    "text": "manifest beacon capsule receipt claim relay signal",
+    "scrubbed": "manifest beacon capsule receipt claim relay signal",
+    "count": 0
+  },
+  {
+    "text": "snapshot manifest receipt snapshot prism beacon profile",
+    "scrubbed": "snapshot manifest receipt snapshot prism beacon profile",
+    "count": 0
+  },
+  {
+    "text": "brief worker harness lexical token anchor ghp_F4K3F4K3F4K3F4K3F4K3 cluster lattice index",
+    "scrubbed": "brief worker harness lexical token anchor [redacted:credential] cluster lattice index",
+    "count": 1
+  },
+  {
+    "text": "coral relay replica scrub cluster",
+    "scrubbed": "coral relay replica scrub cluster",
+    "count": 0
+  },
+  {
+    "text": "replica shard worker policy router token receipt",
+    "scrubbed": "replica shard worker policy router token receipt",
+    "count": 0
+  },
+  {
+    "text": "tether snapshot signal token relay",
+    "scrubbed": "tether snapshot signal token relay",
+    "count": 0
+  },
+  {
+    "text": "cache signal capsule replica replica scrub kernel",
+    "scrubbed": "cache signal capsule replica replica scrub kernel",
+    "count": 0
+  },
+  {
+    "text": "vector ember bridge ledger temporal gateway",
+    "scrubbed": "vector ember bridge ledger temporal gateway",
+    "count": 0
+  },
+  {
+    "text": "lattice token worker token",
+    "scrubbed": "lattice token worker token",
+    "count": 0
+  },
+  {
+    "text": "temporal coral kernel lexical profile",
+    "scrubbed": "temporal coral kernel lexical profile",
+    "count": 0
+  },
+  {
+    "text": "gateway cluster vector snapshot orbit beacon drift temporal",
+    "scrubbed": "gateway cluster vector snapshot orbit beacon drift temporal",
+    "count": 0
+  },
+  {
+    "text": "beacon lexical lattice receipt beacon anchor snapshot",
+    "scrubbed": "beacon lexical lattice receipt beacon anchor snapshot",
+    "count": 0
+  },
+  {
+    "text": "anchor vault gateway harness courier capsule",
+    "scrubbed": "anchor vault gateway harness courier capsule",
+    "count": 0
+  },
+  {
+    "text": "gateway snapshot router router receipt quokka capsule ledger",
+    "scrubbed": "gateway snapshot router router receipt quokka capsule ledger",
+    "count": 0
+  },
+  {
+    "text": "harness scrub vector profile replica",
+    "scrubbed": "harness scrub vector profile replica",
+    "count": 0
+  },
+  {
+    "text": "kernel token cache router shard snapshot",
+    "scrubbed": "kernel token cache router shard snapshot",
+    "count": 0
+  },
+  {
+    "text": "ledger capsule capsule relay",
+    "scrubbed": "ledger capsule capsule relay",
+    "count": 0
+  },
+  {
+    "text": "coral claim temporal signal",
+    "scrubbed": "coral claim temporal signal",
+    "count": 0
+  },
+  {
+    "text": "orbit anchor router tether profile drift replica tether bridge",
+    "scrubbed": "orbit anchor router tether profile drift replica tether bridge",
+    "count": 0
+  },
+  {
+    "text": "vector manifest coral tether brief scrub vault AKIAFAKEFAKEFAKEFAKE router ember beacon",
+    "scrubbed": "vector manifest coral tether brief scrub vault [redacted:credential] router ember beacon",
+    "count": 1
+  },
+  {
+    "text": "index anchor signal beacon",
+    "scrubbed": "index anchor signal beacon",
+    "count": 0
+  },
+  {
+    "text": "relay capsule lexical anchor harness replica beacon ember",
+    "scrubbed": "relay capsule lexical anchor harness replica beacon ember",
+    "count": 0
+  },
+  {
+    "text": "cache token lexical vector queue cluster temporal token orbit",
+    "scrubbed": "cache token lexical vector queue cluster temporal token orbit",
+    "count": 0
+  },
+  {
+    "text": "vector temporal beacon lexical coral index",
+    "scrubbed": "vector temporal beacon lexical coral index",
+    "count": 0
+  },
+  {
+    "text": "coral router prism receipt policy ember vault bridge",
+    "scrubbed": "coral router prism receipt policy ember vault bridge",
+    "count": 0
+  },
+  {
+    "text": "router profile ledger router tether cache orbit",
+    "scrubbed": "router profile ledger router tether cache orbit",
+    "count": 0
+  },
+  {
+    "text": "orbit gateway ledger prism temporal",
+    "scrubbed": "orbit gateway ledger prism temporal",
+    "count": 0
+  },
+  {
+    "text": "manifest lexical harness token router vault signal policy",
+    "scrubbed": "manifest lexical harness token router vault signal policy",
+    "count": 0
+  },
+  {
+    "text": "relay vector ember token",
+    "scrubbed": "relay vector ember token",
+    "count": 0
+  },
+  {
+    "text": "anchor replica beacon manifest capsule brief",
+    "scrubbed": "anchor replica beacon manifest capsule brief",
+    "count": 0
+  },
+  {
+    "text": "quokka cache lattice index anchor vector drift",
+    "scrubbed": "quokka cache lattice index anchor vector drift",
+    "count": 0
+  },
+  {
+    "text": "profile courier cache relay cluster courier replica brief",
+    "scrubbed": "profile courier cache relay cluster courier replica brief",
+    "count": 0
+  },
+  {
+    "text": "tether anchor receipt temporal snapshot gateway",
+    "scrubbed": "tether anchor receipt temporal snapshot gateway",
+    "count": 0
+  },
+  {
+    "text": "profile manifest tether anchor",
+    "scrubbed": "profile manifest tether anchor",
+    "count": 0
+  },
+  {
+    "text": "gateway temporal index coral prism relay profile lattice",
+    "scrubbed": "gateway temporal index coral prism relay profile lattice",
+    "count": 0
+  },
+  {
+    "text": "capsule bridge snapshot queue replica relay queue",
+    "scrubbed": "capsule bridge snapshot queue replica relay queue",
+    "count": 0
+  },
+  {
+    "text": "token ember profile anchor lexical signal brief gateway index sk-FAKEFAKEFAKEFAKEFAKEFAKE replica quokka vault",
+    "scrubbed": "token ember profile anchor lexical signal brief gateway index [redacted:credential] replica quokka vault",
+    "count": 1
+  },
+  {
+    "text": "lattice kernel cache receipt prism cache brief bridge",
+    "scrubbed": "lattice kernel cache receipt prism cache brief bridge",
+    "count": 0
+  },
+  {
+    "text": "shard replica bridge ledger profile manifest bridge index router",
+    "scrubbed": "shard replica bridge ledger profile manifest bridge index router",
+    "count": 0
+  },
+  {
+    "text": "lexical replica tether courier coral",
+    "scrubbed": "lexical replica tether courier coral",
+    "count": 0
+  },
+  {
+    "text": "ember queue policy signal coral",
+    "scrubbed": "ember queue policy signal coral",
+    "count": 0
+  },
+  {
+    "text": "token ledger orbit orbit tether brief ledger",
+    "scrubbed": "token ledger orbit orbit tether brief ledger",
+    "count": 0
+  },
+  {
+    "text": "kernel beacon claim kernel token worker replica",
+    "scrubbed": "kernel beacon claim kernel token worker replica",
+    "count": 0
+  },
+  {
+    "text": "capsule signal manifest gateway relay harness snapshot policy",
+    "scrubbed": "capsule signal manifest gateway relay harness snapshot policy",
+    "count": 0
+  },
+  {
+    "text": "anchor index router cluster capsule vault",
+    "scrubbed": "anchor index router cluster capsule vault",
+    "count": 0
+  },
+  {
+    "text": "vault anchor receipt token bridge drift manifest temporal",
+    "scrubbed": "vault anchor receipt token bridge drift manifest temporal",
+    "count": 0
+  },
+  {
+    "text": "drift snapshot temporal gateway ledger router",
+    "scrubbed": "drift snapshot temporal gateway ledger router",
+    "count": 0
+  },
+  {
+    "text": "snapshot gateway gateway queue prism",
+    "scrubbed": "snapshot gateway gateway queue prism",
+    "count": 0
+  },
+  {
+    "text": "router claim prism claim orbit token",
+    "scrubbed": "router claim prism claim orbit token",
+    "count": 0
+  },
+  {
+    "text": "relay router prism cache lexical orbit",
+    "scrubbed": "relay router prism cache lexical orbit",
+    "count": 0
+  },
+  {
+    "text": "cache gateway worker orbit courier beacon token bridge vector",
+    "scrubbed": "cache gateway worker orbit courier beacon token bridge vector",
+    "count": 0
+  },
+  {
+    "text": "token coral capsule lattice shard cache vector vault",
+    "scrubbed": "token coral capsule lattice shard cache vector vault",
+    "count": 0
+  }
+]

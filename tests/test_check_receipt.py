@@ -170,3 +170,16 @@ def test_workflow_skips_only_dependabot_authored_prs() -> None:
     lines = (ROOT / ".github" / "workflows" / "receipt.yml").read_text(encoding="utf-8").splitlines()
     conditions = [ln.strip() for ln in lines if ln.strip().startswith("if:")]
     assert conditions == ["if: github.event.pull_request.user.login != 'dependabot[bot]'"]
+
+
+TEMPLATE = ROOT / ".github" / "PULL_REQUEST_TEMPLATE.md"
+
+
+def test_pr_template_fails_until_filled_then_passes(tmp_path: Path) -> None:
+    raw = TEMPLATE.read_text(encoding="utf-8")
+    proc = run_gate(tmp_path, raw)
+    assert proc.returncode == 1
+    assert "base_revision is not a git SHA" in proc.stdout
+    filled = raw.replace("<merge-base sha>", BASE).replace("<PR head sha>", HEAD)
+    proc = run_gate(tmp_path, filled)
+    assert proc.returncode == 0, proc.stdout

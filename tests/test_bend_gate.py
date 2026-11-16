@@ -12,6 +12,7 @@ import json
 import os
 import stat
 import sys
+import importlib.util
 import unittest
 from collections import Counter
 from pathlib import Path
@@ -20,8 +21,16 @@ from z0int import bend_gate as bg
 
 ROOT = Path(__file__).resolve().parents[1]
 REF = ROOT / "third_party" / "aodl_a848270"
-sys.path.insert(0, str(REF))
-from aodl_contract import validate  # noqa: E402
+# Load the pinned reference validator under its own name. Putting REF on
+# sys.path would shadow the installed aodl_contract for every later test.
+_spec = importlib.util.spec_from_file_location(
+    "aodl_a848270_contract", REF / "aodl_contract" / "__init__.py",
+    submodule_search_locations=[str(REF / "aodl_contract")],
+)
+_ref = importlib.util.module_from_spec(_spec)
+sys.modules[_spec.name] = _ref
+_spec.loader.exec_module(_ref)
+validate = _ref.validate
 
 CATALOG = bg.load_catalog(REF / "harnesses" / "catalog.json")
 FIXTURES = sorted((REF / "examples").rglob("*.json"))

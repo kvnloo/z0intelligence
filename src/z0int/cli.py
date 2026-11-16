@@ -307,6 +307,16 @@ def build_parser() -> argparse.ArgumentParser:
     mss.add_argument("--which", choices=("resident", "on_demand", "all"), default="resident")
     mss.add_argument("--dry-run", action="store_true")
 
+    cap = sub.add_parser("capacity", help="Read-only federated capacity projection")
+    cap_sub = cap.add_subparsers(dest="capacity_cmd", required=True)
+    caps = cap_sub.add_parser("snapshot", help="Emit z0.capacity.snapshot.v1")
+    _json_flag(caps)
+    caps.add_argument("--tern", default=None, help="normalized Tern host/session JSON export")
+    caps.add_argument("--kerdoios", default=None, help="Kerdoios capacity/quota JSON export")
+    caps.add_argument("--leases", default=None, help="optional placement-lease JSON projection")
+    caps.add_argument("--output", default=None, help="snapshot destination under private state by default")
+    caps.add_argument("--no-local", action="store_true", help="omit local direct-host probe")
+
     data = sub.add_parser("data", help="Data source helpers")
     data_sub = data.add_subparsers(dest="data_cmd", required=True)
     dd = data_sub.add_parser("discover", help="Find Hermes/OMP/Codex/export paths")
@@ -853,8 +863,7 @@ def _cmd_context(args: argparse.Namespace) -> int:
         turn_key=getattr(args, "turn_key", None),
     )
     payload = packet.to_dict()
-    if args.json or True:
-        print(json.dumps(payload, indent=2, ensure_ascii=False))
+    print(json.dumps(payload, indent=2, ensure_ascii=False))
     return 0 if not packet.unresolved_gaps else 0  # gaps are data, not process failure
 
 
@@ -874,8 +883,7 @@ def _cmd_task(args: argparse.Namespace) -> int:
     )
 
     def emit(obj: dict) -> None:
-        if getattr(args, "json", False) or True:
-            print(json.dumps(obj, indent=2, ensure_ascii=False, default=str))
+        print(json.dumps(obj, indent=2, ensure_ascii=False, default=str))
 
     cmd = args.task_cmd
     if cmd == "status":
@@ -961,6 +969,20 @@ def main(argv: list[str] | None = None) -> int:
                 dry_run=bool(getattr(args, "dry_run", False)),
                 as_json=as_json,
             )
+    if args.cmd == "capacity":
+        if args.capacity_cmd == "snapshot":
+            from . import capacity_snapshot
+
+            argv2 = []
+            for flag in ("tern", "kerdoios", "leases", "output"):
+                value = getattr(args, flag, None)
+                if value:
+                    argv2 += [f"--{flag}", value]
+            if bool(getattr(args, "no_local", False)):
+                argv2.append("--no-local")
+            if as_json:
+                argv2.append("--json")
+            return capacity_snapshot.main(argv2)
     if args.cmd == "data":
         if args.data_cmd == "discover":
             return cmd_data_discover(as_json=as_json)

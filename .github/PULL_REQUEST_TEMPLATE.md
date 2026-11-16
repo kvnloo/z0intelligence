@@ -1,6 +1,8 @@
 <!--
 Contributors: `z0int contribute pr <task-id>` writes this body for you, with the
 receipts filled in. See CONTRIBUTING.md. PRs target `master` from your fork.
+The `receipt` check reads the yaml block: push first, then put `git rev-parse HEAD`
+in head_revision. Editing this description re-runs the check.
 -->
 
 ## Task
@@ -30,6 +32,6 @@ tests:
   green: "<command + result on the head sha>"
 ```
 
-- [ ] I have read and agree to the z0intelligence Contributor License Agreement (the CLA bot checks this PR).
+- [ ] I license this contribution under the MIT License (inbound = outbound; no Contributor License Agreement needed).
 - [ ] The claim for an `exclusive` task is posted and active (`/claim` on the issue).
 - [ ] No personal data (profile, paths, credentials, transcripts) is in this PR.
