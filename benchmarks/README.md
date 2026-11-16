@@ -153,3 +153,9 @@ The source-specific transformations are described in [METHOD.md](../docs/METHOD.
 (cd results/raw && sha256sum -c SHA256SUMS)
 python benchmarks/verify_published.py
 ```
+
+## z0int memory search (HC-2 hill climb)
+
+`memory_search/` benchmarks `z0int.memory.surface.search` against 50 frozen synthetic queries and
+reports p50/p90/max latency plus a hash of each query's ordered result ids, so a speed change can
+be checked for identical results before it lands. See [memory_search/README.md](memory_search/README.md).

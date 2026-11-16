@@ -134,14 +134,6 @@ def compile_episode(snapshot: dict[str, Any], *, label: str | None = None) -> di
     }
 
 
-def evaluate_and_store(family: ContrastFamily, recipe: dict[str, Any] | None = None) -> dict[str, Any]:
-    out = evaluate_recipe_on_family(family, recipe) if recipe else evaluate_family(family)
-    dep = EvidenceDependency(**{k: v for k, v in out["dependency"].items() if k != "schema"})
-    path = store_dependency(dep)
-    out["dependency_path"] = str(path)
-    return out
-
-
 def families_jsonl_path(root: Path | None = None) -> Path:
     from z0int import paths
 
@@ -175,10 +167,3 @@ def compile_and_store(snapshot: dict[str, Any], *, label: str | None = None) -> 
     return ep
 
 
-def load_families_jsonl(path: Path | str) -> list[ContrastFamily]:
-    rows = []
-    for line in Path(path).read_text(encoding="utf-8").splitlines():
-        line = line.strip()
-        if line:
-            rows.append(ContrastFamily.from_dict(json.loads(line)))
-    return rows

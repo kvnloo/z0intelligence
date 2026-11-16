@@ -42,14 +42,6 @@ def _latest_receipts(root: Path | None = None) -> dict[str, dict[str, Any]]:
     return latest
 
 
-def _latest_ao_receipts(root: Path | None = None) -> dict[str, dict[str, Any]]:
-    return {
-        trace_id: row
-        for trace_id, row in _latest_receipts(root).items()
-        if row.get("capability_id") == CAPABILITY
-    }
-
-
 def _ao_events(root: Path | None = None) -> list[dict[str, Any]]:
     return list(_iter_jsonl(ao_events_path(root)) or [])
 

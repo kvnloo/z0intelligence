@@ -14,7 +14,7 @@ seam, Tokenomics usage receipts, and levers promoted only on paired, verified ev
 | Usage receipts | plugin `Stop` + `SessionEnd` | equal to Claude Code's billed usage on all four token fields | on |
 | Automatic routing | plugin `UserPromptSubmit` | inert in shadow (default) | shadow |
 | ObservationPack | `--plugin-dir harness-adapters/claude-code-z0-obspack` | short tasks: null; long recall task (n=12): −30.3% total, Wilcoxon p=0.0068, 12/12 verified; on top of lean a further −38.2% median (6/6, p=0.031) | **opt-in for long, output-heavy sessions** |
-| Skill exposure | `z0int.claude_code_skills` | best 2/30 misses; bar ≤1/30 | not promoted |
+| Skill exposure | removed in the z0v2 prune; recover from b345aa2b | best 2/30 misses; bar ≤1/30 | not promoted |
 
 ## Install
 

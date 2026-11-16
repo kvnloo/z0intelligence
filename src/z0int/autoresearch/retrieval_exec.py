@@ -38,28 +38,6 @@ def promotion_allowed(row: dict[str, Any]) -> bool:
     return True
 
 
-def backend_health() -> dict[str, Any]:
-    """Classify installed backends. A tunnel that forwards off-host is unavailable."""
-    ctx = _which("ctx")
-    qmd = _which("qmd")
-    agentsview = _which("agentsview")
-    tunnel = Path.home() / ".config/systemd/user/tencentdb-memory-tunnel.service"
-    forwards = False
-    if tunnel.is_file():
-        text = tunnel.read_text(encoding="utf-8", errors="replace")
-        forwards = "100.113.138.100" in text or "ssh -N" in text
-    return {
-        "schema": "z0int.retrieval_backend_health.v1",
-        "ctx_lexical": "available" if ctx else "source_absent",
-        "ctx_path": ctx,
-        "qmd": "source_absent" if not qmd else "available",
-        "agentsview": "source_absent" if not agentsview else "available",
-        "optmem": "not_indexed",
-        "tencentdb": "unavailable_forwards_off_host" if forwards else "source_absent",
-        "semantic": "not_permitted",
-    }
-
-
 def _which(name: str) -> str | None:
     for part in os.environ.get("PATH", "").split(":"):
         cand = Path(part) / name
@@ -261,6 +239,3 @@ def _nested(parsed: Any, *keys: str) -> Any:
     return cur
 
 
-def recipe_schema_ok(recipe: ResolutionRecipe) -> bool:
-    body = recipe.to_dict()
-    return body.get("schema") == RECIPE_SCHEMA and bool(body.get("operations"))

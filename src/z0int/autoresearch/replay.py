@@ -92,12 +92,6 @@ def run_abab_job(job: dict[str, Any]) -> dict[str, Any]:
         frozen = json.loads(champ_path.read_text(encoding="utf-8"))
         champ = frozen.get("policy") or champ
 
-    arms_spec = [
-        ("A0", champ),
-        ("B0", None),  # filled with first challenger
-        ("A1", champ),
-        ("B1", None),
-    ]
     challengers = challenger_policies(champ)
     primary = challengers[0] if challengers else champ
     results: list[dict[str, Any]] = []
