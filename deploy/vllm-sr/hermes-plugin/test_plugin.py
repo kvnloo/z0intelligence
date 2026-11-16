@@ -64,6 +64,13 @@ def test_ledger_counts_only_scored_free_trials():
     ]
     assert sr.ledger_rows(rows) == [{"model": "a", "source": "skillsbench", "score0to1": 0.5, "n": 2, "date": "2026-11-16"}]
     assert sr.ledger_rows([rows[2]]) == []                                                          # infra-only: no score
+    # 11-16 matrix: a model that burns its whole time budget failed the task; dropping it inflated the score.
+    slow = {**base, "combo": "free/a", "model": "vllm-sr/m/a", "reward": 0.0, "error_class": "timeout"}
+    late = {**base, "combo": "free/a", "model": "vllm-sr/m/a", "reward": 1.0, "error_class": "timeout"}
+    skip = {**base, "combo": "free/a", "model": "vllm-sr/m/a", "reward": None, "error_class": "skipped:lane_x"}
+    nore = {**base, "combo": "free/a", "model": "vllm-sr/m/a", "reward": None, "error_class": "verifier_no_reward"}
+    assert sr.ledger_rows([slow, late, skip, nore])[0] | {"date": 0} == \
+        {"model": "a", "source": "skillsbench", "score0to1": 0.5, "n": 2, "date": 0}
 
 
 def test_status_reports_router_down_instead_of_guessing(monkeypatch):

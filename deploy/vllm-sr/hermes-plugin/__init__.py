@@ -172,13 +172,20 @@ BENCH_RESULTS = Path("/mnt/zer0models/workspace/zer0/data/operations/bench-round
 LEDGER = SR_DIR / "profiles/capability.jsonl"  # read by free_pool.capability() (#339)
 
 
+def graded(r: dict) -> bool:
+    """A trial says something about the model: it ran and was graded. A timeout counts (the model ran out of
+    time); infra failures, lane skips and a verifier that produced no reward do not."""
+    e = str(r.get("error_class") or "")
+    return not (e.startswith(("infra:", "skipped:")) or e == "verifier_no_reward" or r.get("reward") is None)
+
+
 def ledger_rows(results: list[dict]) -> list[dict]:
     """bench-r1 trial rows -> one capability row per (free model, suite): pass rate over scored trials.
 
     Infra failures, smoke runs and unclean trials are not evidence about the model, so they never count."""
     agg: dict[tuple, list] = {}
     for r in results:
-        if not str(r.get("combo", "")).startswith("free/") or r.get("error_class") or r.get("smoke") \
+        if not str(r.get("combo", "")).startswith("free/") or not graded(r) or r.get("smoke") \
                 or r.get("clean") is False:
             continue
         k = (str(r["model"]).split("/")[-1].removesuffix(":free"), r.get("suite") or "bench")
