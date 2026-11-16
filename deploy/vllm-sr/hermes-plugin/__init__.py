@@ -168,6 +168,39 @@ def status() -> dict:
     return out
 
 
+BENCH_RESULTS = Path("/mnt/zer0models/workspace/zer0/data/operations/bench-round1-20261105/results.jsonl")
+LEDGER = SR_DIR / "profiles/capability.jsonl"  # read by free_pool.capability() (#339)
+
+
+def ledger_rows(results: list[dict]) -> list[dict]:
+    """bench-r1 trial rows -> one capability row per (free model, suite): pass rate over scored trials.
+
+    Infra failures, smoke runs and unclean trials are not evidence about the model, so they never count."""
+    agg: dict[tuple, list] = {}
+    for r in results:
+        if not str(r.get("combo", "")).startswith("free/") or r.get("error_class") or r.get("smoke") \
+                or r.get("clean") is False:
+            continue
+        k = (str(r["model"]).split("/")[-1].removesuffix(":free"), r.get("suite") or "bench")
+        a = agg.setdefault(k, [0, 0, ""])
+        a[0] += 1 if (r.get("reward") or 0) >= 1 or r.get("passed") else 0
+        a[1] += 1
+        a[2] = max(a[2], str(r.get("finished_at", ""))[:10])
+    return [{"model": m, "source": s, "score0to1": round(p / n, 4), "n": n, "date": d}
+            for (m, s), (p, n, d) in sorted(agg.items())]
+
+
+def scores(src: Path = BENCH_RESULTS, write: bool = False) -> dict:
+    rows = [json.loads(l) for l in src.read_text().splitlines() if l.strip()] if src.exists() else []
+    out = ledger_rows(rows)
+    infra = sum(1 for r in rows if str(r.get("combo", "")).startswith("free/") and r.get("error_class"))
+    if write and out:
+        LEDGER.parent.mkdir(parents=True, exist_ok=True)
+        LEDGER.write_text("".join(json.dumps(r) + "\n" for r in out))
+    return {"source": str(src), "trials": len(rows), "free_infra_failures": infra, "rows": out,
+            "written": str(LEDGER) if write and out else None}
+
+
 def _table(rows: list[dict]) -> str:
     return "\n".join(f"{r['status']:<34} {r['key']:<20} {r['backends']:>3} backends  {r['provider']}  {r['signup']}" for r in rows)
 
@@ -184,6 +217,9 @@ def setup_parser(p):
     b.add_argument("n", nargs="?", type=int, default=60)
     b.add_argument("c", nargs="?", type=int, default=20)
     b.add_argument("--out", default=None)
+    s = sub.add_parser("scores", help="bench-r1 results -> capability.jsonl rows (free models; infra excluded)")
+    s.add_argument("--from", dest="src", default=str(BENCH_RESULTS))
+    s.add_argument("--write", action="store_true", help=f"write {LEDGER.name} for the ranker")
     lp = sub.add_parser("lanes", help="free_pool.py lanes plan")
     lp.add_argument("rest", nargs="*")
 
@@ -198,6 +234,8 @@ def run(args) -> int:
         env = {**os.environ, "VSR_URL": BASE}
         return subprocess.call([sys.executable, str(SR_DIR / "bench_fanout.py"), str(args.n), str(args.c),
                                 *([args.out] if args.out else [])], env=env)
+    elif cmd == "scores":
+        print(json.dumps(scores(Path(args.src), args.write), indent=1))
     elif cmd == "lanes":
         return subprocess.call([sys.executable, str(SR_DIR / "free_pool.py"), "lanes", *args.rest])
     return 0

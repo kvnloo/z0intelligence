@@ -52,6 +52,20 @@ def test_bws_store_needs_project_and_token(monkeypatch):
         raise AssertionError("bws without config must refuse")
 
 
+def test_ledger_counts_only_scored_free_trials():
+    base = {"suite": "skillsbench", "clean": True, "smoke": False, "error_class": None, "finished_at": "2026-11-16T10:00"}
+    rows = [
+        {**base, "combo": "free/a", "model": "vllm-sr/m/a", "reward": 1.0},
+        {**base, "combo": "free/a", "model": "vllm-sr/m/a", "reward": 0.0},
+        {**base, "combo": "free/a", "model": "vllm-sr/m/a", "reward": 0.0, "error_class": "infra:docker"},  # not the model's fault
+        {**base, "combo": "free/a", "model": "vllm-sr/m/a", "reward": 1.0, "smoke": True},
+        {**base, "combo": "free/a", "model": "vllm-sr/m/a", "reward": 1.0, "clean": False},
+        {**base, "combo": "opus/x", "model": "claude", "reward": 1.0},                               # not free
+    ]
+    assert sr.ledger_rows(rows) == [{"model": "a", "source": "skillsbench", "score0to1": 0.5, "n": 2, "date": "2026-11-16"}]
+    assert sr.ledger_rows([rows[2]]) == []                                                          # infra-only: no score
+
+
 def test_status_reports_router_down_instead_of_guessing(monkeypatch):
     monkeypatch.setattr(sr, "BASE", "http://127.0.0.1:9/v1")
     s = sr.status()
