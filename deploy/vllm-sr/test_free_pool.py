@@ -84,8 +84,11 @@ def test_weights_spread_by_bucket_capacity_and_eval():
     assert [r["model"] for r in fp.weigh(refs, q.get)] == [r["model"] for r in refs]  # fallback order kept
 
 
-def test_free_entrypoint_routes_task_keywords_to_family_decisions():
+def test_free_entrypoint_routes_task_keywords_to_family_decisions(monkeypatch):
     import yaml, tempfile
+    # Hermetic: every candidate evaluated equally (profiles/results.jsonl is local, not in git).
+    v = {"quality_hard": 0.8, "reliability": 1.0, "family_acc": {f: 0.8 for f in fp.FAMILIES}}
+    monkeypatch.setattr(fp, "eval_scores", lambda: {c[3].split("/")[-1].removesuffix(":free"): v for c in fp.CANDIDATES})
     out = Path(tempfile.mkdtemp()) / "c.yaml"
     fp.render(out=out)
     c = yaml.safe_load(out.read_text())

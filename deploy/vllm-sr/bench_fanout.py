@@ -4,7 +4,7 @@ Records per-call model, status, latency, and peak in-flight overlap. Usage: benc
 import json, ssl, sys, threading, time, urllib.request, urllib.error, concurrent.futures as cf
 from collections import Counter
 
-ROUTER = __import__("os").environ.get("VSR_URL", "http://10.43.216.55:8899/v1") + "/chat/completions"
+ROUTER = __import__("os").environ.get("VSR_URL", "http://100.113.138.100:30899/v1") + "/chat/completions"
 N, C = int(sys.argv[1]), int(sys.argv[2])
 OUT = sys.argv[3] if len(sys.argv) > 3 else None
 TASKS = [f"Classify the sentiment of this review as positive, negative or neutral. Answer with one word. Review #{i}: "

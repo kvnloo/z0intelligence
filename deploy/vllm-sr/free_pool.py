@@ -208,7 +208,8 @@ def eval_scores():
     Quality is the model's, not the host's, so one score covers every provider serving that model."""
     sys.path.insert(0, str(HERE / "profiles"))
     from score import score
-    rows = [json.loads(l) for l in (HERE / "profiles/results.jsonl").read_text().splitlines() if l.strip()]
+    res = HERE / "profiles/results.jsonl"  # local eval output, not in git: a fresh install ranks by headroom only
+    rows = [json.loads(l) for l in res.read_text().splitlines() if l.strip()] if res.exists() else []
     out = {}
     for key, v in score(rows).items():
         if v["provider"] != "router" and (v["n_hard"] or 0) >= 8:
