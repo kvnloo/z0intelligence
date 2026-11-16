@@ -51,7 +51,7 @@ tasks:
     kind: issue
     tier: P0
     rank: 2
-    status: open
+    status: done  # kvnloo/z0intelligence#133 closed
     gate: null
     newcomer: true
     needs_owner_approval: false

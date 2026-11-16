@@ -46,7 +46,8 @@ def test_skill_is_a_thin_cli_wrapper_and_plugin_copy_is_in_sync():
 
 def test_contributing_states_cla_credit_and_default_branch():
     text = _read("CONTRIBUTING.md")
-    assert "Contributor License Agreement" in text and "CLA bot" in text
+    # Owner decision 11-15: MIT repo, inbound = outbound, no CLA (the CLA is z0-only).
+    assert "no Contributor License Agreement" in text and "inbound = outbound" in text
     assert ".z0/credits.yaml" in text and "Credit: @" in text
     assert "target the default branch **`master`**" in text
     assert "z0evals" in text and "grok" in text
@@ -54,7 +55,7 @@ def test_contributing_states_cla_credit_and_default_branch():
 
 def test_pr_template_carries_task_receipts_credit_and_receipt_yaml():
     text = _read(".github/PULL_REQUEST_TEMPLATE.md")
-    for must in ("Task id:", "Receipts", "Credit: @", "Contributor License Agreement", "head_revision:",
+    for must in ("Task id:", "Receipts", "Credit: @", "inbound = outbound", "head_revision:",
                  "base_revision:", "red:", "green:"):
         assert must in text, must
 

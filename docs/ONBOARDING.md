@@ -34,7 +34,7 @@ The agent should:
 To find and do a first task, run `z0int contribute` (agents: `z0int contribute --json`
 and follow `next_action`). It checks this setup, runs an offline smoke eval, and
 suggests a task from `.z0/priorities.yaml` that fits the machine. Steps, the claim
-protocol, the CLA and credit are in [CONTRIBUTING.md](../CONTRIBUTING.md).
+protocol, terms (MIT, no CLA) and credit are in [CONTRIBUTING.md](../CONTRIBUTING.md).
 
 z0evals ([kvnloo/z0evals](https://github.com/kvnloo/z0evals)) holds the frozen
 studies and public results. It is in scope for contributors: tasks of kind `z0evals`

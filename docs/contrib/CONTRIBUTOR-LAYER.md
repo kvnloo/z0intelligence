@@ -491,7 +491,7 @@ Files referenced:
 ## 7. Owner decisions (2026-10-26)
 - **O-1:** ship `.z0/priorities.yaml` as a DRAFT; the owner reviews ranks before merge.
 - **O-2:** the systems profile maps to Python/C++ performance and latency tasks (e.g. #139, #137) until a Rust starter exists.
-- **O-3:** contribution terms are a **CLA** (CLA bot on PRs); credit via `.z0/credits.yaml` plus a PR line.
+- **O-3:** contribution terms: **no CLA** for this MIT repo (inbound = outbound, GitHub ToS D.6; decided 11-15, the CLA lives on z0 only); credit via `.z0/credits.yaml` plus a PR line.
 - **O-4:** the claim bot MAY write the `claimed` label (with lease) and one claim comment on origin, and expire stale claims.
 - **O-5:** external contributor PRs target the **default branch** (`master`) like most repos; branch protection + required checks gate them and the owner merges. `preview`/`nightly` stay for internal automated workers.
 - **O-6:** contributors may use any harness; grok and cursor are never used as LLM providers by our tooling.
