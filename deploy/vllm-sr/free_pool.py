@@ -294,13 +294,14 @@ QUEUE = RESEARCH / "20261102/signup-queue.json"  # the one signup queue (state t
 def merge_scan(queue, providers, today):
     """Append providers a scan found that the queue lacks, as todo rows; return the new rows."""
     known = {r["domain"] for r in queue}
+    routed = {".".join((c[1].split("/")[2]).split(".")[-2:]) for c in CANDIDATES}  # e.g. nvidia.com, kilo.ai
     new = []
     for r in providers:
-        if r["domain"] in known or r.get("status") not in ("open_catalog", "needs_key") or CLOSED.search(r["domain"]):
+        if r["domain"] in known or r["domain"] == "localhost" or r.get("status") not in ("open_catalog", "needs_key") or CLOSED.search(r["domain"]):
             continue
         free = [i for i in r.get("free_ids", []) if not CLOSED.search(i)]
         new.append({"domain": r["domain"], "base_url": r.get("base_url"), "lists": r.get("lists", 0),
-                    "free_models": len(free), "state": "todo", "vault_handle": None, "bws_key": None,
+                    "free_models": len(free), "state": "routed" if r["domain"] in routed else "todo", "vault_handle": None, "bws_key": None,
                     "blocker": None, "found": today, "keyless": r["status"] == "open_catalog"})
     return new
 
@@ -319,7 +320,7 @@ def scout():
     if new:
         QUEUE.with_suffix(".tmp").write_text(json.dumps(queue + new, indent=1))
         QUEUE.with_suffix(".tmp").replace(QUEUE)
-        top = sorted(new, key=lambda x: (-x["free_models"], -x["lists"]))[:8]
+        top = sorted((x for x in new if x["state"] == "todo"), key=lambda x: (-x["free_models"], -x["lists"]))[:8]
         subprocess.run(["kevin-push", "decision", f"{len(new)} new free LLM providers queued",
                         "Sign-ups wanted (queue " + str(QUEUE) + "): " +
                         ", ".join(f"{x['domain']} ({x['free_models']} free)" for x in top)], timeout=60)

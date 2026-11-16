@@ -282,10 +282,11 @@ def test_scout_queues_only_unseen_providers():
               "free_ids": ["a/b:free", "google/gemma-x:free"]},
              {"domain": "keyed.ai", "status": "needs_key", "lists": 2},
              {"domain": "dead.ai", "status": "unreachable"},
-             {"domain": "gemini.google.com", "status": "needs_key"}]
+             {"domain": "gemini.google.com", "status": "needs_key"},
+             {"domain": "nvidia.com", "status": "open_catalog"}]                   # already on the router
     new = fp.merge_scan(queue, found, "20261115")
     assert [(r["domain"], r["free_models"], r["keyless"], r["state"]) for r in new] == [
-        ("newfree.ai", 1, True, "todo"), ("keyed.ai", 0, False, "todo")]
+        ("newfree.ai", 1, True, "todo"), ("keyed.ai", 0, False, "todo"), ("nvidia.com", 0, True, "routed")]
 
 
 def test_pace_retries_a_failed_deploy_next_minute(monkeypatch):
