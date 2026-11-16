@@ -34,6 +34,9 @@ python -m pip install torch==2.10.0+cpu --index-url https://download.pytorch.org
 python -m pip install -e '.[test,ml]'
 ```
 
+`./scripts/bootstrap.sh` does the light install into `.venv`; run it as
+`Z0INT_EXTRAS=test,ml ./scripts/bootstrap.sh` for the ML stack.
+
 CI runs the full offline suite (`python -m pytest -q -m 'not live'`, about
 10,000 tests) on every PR, so you don't have to run it all locally.
 

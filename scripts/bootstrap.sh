@@ -5,8 +5,19 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
-PYTHON="${PYTHON:-python3}"
+# pyproject requires >=3.10,<3.14; pick a supported interpreter when python3 is newer.
+if [[ -z "${PYTHON:-}" ]]; then
+  for cand in python3 python3.13 python3.12 python3.11 python3.10; do
+    if command -v "$cand" >/dev/null && "$cand" -c 'import sys; sys.exit(not ((3, 10) <= sys.version_info[:2] < (3, 14)))'; then
+      PYTHON=$cand; break
+    fi
+  done
+  [[ -n "${PYTHON:-}" ]] || { echo "error: need Python 3.10-3.13 (set PYTHON=...); uv python install 3.12 is one way" >&2; exit 1; }
+fi
 VENV="${VENV:-$ROOT/.venv}"
+# Light by default (no torch) so contributors on any machine finish fast.
+# Models/backends work: Z0INT_EXTRAS=test,ml ./scripts/bootstrap.sh
+EXTRAS="${Z0INT_EXTRAS:-test}"
 
 banner() { printf '\n==> %s\n' "$*"; }
 
@@ -14,6 +25,7 @@ banner "z0int bootstrap"
 echo "  root: $ROOT"
 echo "  python: $PYTHON"
 echo "  venv: $VENV"
+echo "  extras: $EXTRAS"
 
 if [[ ! -f "$ROOT/pyproject.toml" ]]; then
   echo "error: run from z0int repo root" >&2
@@ -28,7 +40,7 @@ fi
 source "$VENV/bin/activate"
 python -m pip install -q -U pip
 banner "Installing z0int / openjev-phase1 editable"
-pip install -q -e ".[test,ml]"
+pip install -q -e ".[$EXTRAS]"
 
 banner "doctor"
 python -m z0int doctor || true
