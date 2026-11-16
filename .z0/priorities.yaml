@@ -562,3 +562,355 @@ tasks:
     verifier: null
     exit_criterion: "research umbrella"
     impact_note: "research umbrella"
+
+  # ---------------------------------------------------------------- claimable issues (added 11-15)
+
+  - id: t-343-overload-503-flake
+    issue: 343
+    title: "fix flaky overload test: Broken pipe instead of 503"
+    kind: issue
+    tier: P2
+    rank: 7
+    status: open
+    gate: null
+    newcomer: true
+    needs_owner_approval: false
+    claim: exclusive
+    difficulty: S
+    expected_hours: 2
+    skills: [python, latency, systems]
+    toolchains: [python]
+    touches: [src/z0int/intelligence_service.py, tests/test_agentweb_bridge_overload.py]
+    hardware: {gpu_vram_gib: 0, ram_gib: 8, disk_gib: 2, os: [linux, macos], arch: [x86_64, arm64]}
+    runtime: repo_only
+    network: none
+    risk_class: low
+    smoke: null
+    verifier: "python -m pytest -q tests/test_agentweb_bridge_overload.py"
+    exit_criterion: "test passes 50/50 runs without Broken pipe"
+    impact_note: "a test the whole team can trust again"
+
+  - id: t-344-hook-walltime-flake
+    issue: 344
+    title: "de-flake the hook wall-time budget test (quarantined xfail)"
+    kind: issue
+    tier: P2
+    rank: 8
+    status: open
+    gate: null
+    newcomer: true
+    needs_owner_approval: false
+    claim: exclusive
+    difficulty: S
+    expected_hours: 2
+    skills: [python, latency, plugin-hooks]
+    toolchains: [python]
+    touches: [tests/test_hook_adapter.py]
+    hardware: {gpu_vram_gib: 0, ram_gib: 8, disk_gib: 2, os: [linux, macos], arch: [x86_64, arm64]}
+    runtime: repo_only
+    network: none
+    risk_class: low
+    smoke: null
+    verifier: "python -m pytest -q tests/test_hook_adapter.py"
+    exit_criterion: "xfail removed and test stable on CI"
+    impact_note: "a test the whole team can trust again"
+
+  - id: t-352-optchat-local-fail
+    issue: 352
+    title: "find why optchat helper never answers locally (green in CI)"
+    kind: issue
+    tier: P2
+    rank: 9
+    status: open
+    gate: null
+    newcomer: true
+    needs_owner_approval: false
+    claim: exclusive
+    difficulty: S
+    expected_hours: 2
+    skills: [python, plugin-hooks, systems]
+    toolchains: [python]
+    touches: [harness-adapters/hermes-z0intelligence/optchat.py, tests/test_hermes_optchat.py]
+    hardware: {gpu_vram_gib: 0, ram_gib: 8, disk_gib: 2, os: [linux, macos], arch: [x86_64, arm64]}
+    runtime: repo_only
+    network: none
+    risk_class: low
+    smoke: null
+    verifier: "python -m pytest -q tests/test_hermes_optchat.py"
+    exit_criterion: "root cause named; 4 tests pass locally and in CI"
+    impact_note: "a test the whole team can trust again"
+
+  - id: t-309-zi-distill-program
+    issue: 309
+    title: "LLM writes the decision program (distill episodes into deterministic code)"
+    kind: experiment
+    tier: P3
+    rank: 5
+    status: open
+    gate: null
+    newcomer: false
+    needs_owner_approval: false
+    claim: exclusive
+    difficulty: L
+    expected_hours: 8
+    skills: [python, ml-eval, benchmarking]
+    toolchains: [python]
+    touches: [experiments/zi-distill-program/]
+    hardware: {gpu_vram_gib: 0, ram_gib: 8, disk_gib: 2, os: [linux, macos], arch: [x86_64, arm64]}
+    runtime: repo_only
+    network: other
+    risk_class: low
+    smoke: null
+    verifier: null
+    exit_criterion: "experiment receipt for zi-distill-program with a stated result, positive or negative"
+    impact_note: "an answer to an open research question"
+
+  - id: t-310-zi-residual-tiny
+    issue: 310
+    title: "Tiny model (<=10k params) learns only the residual the program cannot decide"
+    kind: experiment
+    tier: P3
+    rank: 6
+    status: open
+    gate: null
+    newcomer: false
+    needs_owner_approval: false
+    claim: exclusive
+    difficulty: L
+    expected_hours: 8
+    skills: [python, ml-eval, benchmarking]
+    toolchains: [python]
+    touches: [experiments/zi-residual-tiny/]
+    hardware: {gpu_vram_gib: 0, ram_gib: 8, disk_gib: 2, os: [linux, macos], arch: [x86_64, arm64]}
+    runtime: repo_only
+    network: other
+    risk_class: low
+    smoke: null
+    verifier: null
+    exit_criterion: "experiment receipt for zi-residual-tiny with a stated result, positive or negative"
+    impact_note: "an answer to an open research question"
+
+  - id: t-311-zi-capacity-frontier
+    issue: 311
+    title: "Capacity frontier: params x choice-set size at 95% accuracy x latency"
+    kind: experiment
+    tier: P3
+    rank: 7
+    status: open
+    gate: null
+    newcomer: false
+    needs_owner_approval: false
+    claim: exclusive
+    difficulty: L
+    expected_hours: 8
+    skills: [python, ml-eval, benchmarking]
+    toolchains: [python]
+    touches: [experiments/zi-capacity-frontier/]
+    hardware: {gpu_vram_gib: 0, ram_gib: 8, disk_gib: 2, os: [linux, macos], arch: [x86_64, arm64]}
+    runtime: repo_only
+    network: other
+    risk_class: low
+    smoke: null
+    verifier: null
+    exit_criterion: "experiment receipt for zi-capacity-frontier with a stated result, positive or negative"
+    impact_note: "an answer to an open research question"
+
+  - id: t-312-zi-teacher-generations
+    issue: 312
+    title: "Does a smarter teacher make a smarter student? Lift per LLM generation"
+    kind: experiment
+    tier: P3
+    rank: 8
+    status: open
+    gate: null
+    newcomer: false
+    needs_owner_approval: false
+    claim: exclusive
+    difficulty: L
+    expected_hours: 8
+    skills: [python, ml-eval, benchmarking]
+    toolchains: [python]
+    touches: [experiments/zi-teacher-generations/]
+    hardware: {gpu_vram_gib: 0, ram_gib: 8, disk_gib: 2, os: [linux, macos], arch: [x86_64, arm64]}
+    runtime: repo_only
+    network: other
+    risk_class: low
+    smoke: null
+    verifier: null
+    exit_criterion: "experiment receipt for zi-teacher-generations with a stated result, positive or negative"
+    impact_note: "an answer to an open research question"
+
+  - id: t-313-zi-selective-routing
+    issue: 313
+    title: "Frontier calls removed at fixed verified quality (counterfactual replay)"
+    kind: experiment
+    tier: P3
+    rank: 9
+    status: open
+    gate: null
+    newcomer: false
+    needs_owner_approval: false
+    claim: exclusive
+    difficulty: L
+    expected_hours: 8
+    skills: [python, ml-eval, benchmarking]
+    toolchains: [python]
+    touches: [experiments/zi-selective-routing/]
+    hardware: {gpu_vram_gib: 0, ram_gib: 8, disk_gib: 2, os: [linux, macos], arch: [x86_64, arm64]}
+    runtime: repo_only
+    network: other
+    risk_class: low
+    smoke: null
+    verifier: null
+    exit_criterion: "experiment receipt for zi-selective-routing with a stated result, positive or negative"
+    impact_note: "an answer to an open research question"
+
+  - id: t-314-zi-context-superopt
+    issue: 314
+    title: "Context superoptimizer on public coding tasks (autoresearch V0)"
+    kind: experiment
+    tier: P3
+    rank: 10
+    status: open
+    gate: null
+    newcomer: false
+    needs_owner_approval: false
+    claim: exclusive
+    difficulty: L
+    expected_hours: 8
+    skills: [python, ml-eval, benchmarking]
+    toolchains: [python]
+    touches: [src/z0int/autoresearch/]
+    hardware: {gpu_vram_gib: 0, ram_gib: 8, disk_gib: 2, os: [linux, macos], arch: [x86_64, arm64]}
+    runtime: repo_only
+    network: other
+    risk_class: low
+    smoke: null
+    verifier: null
+    exit_criterion: "experiment receipt for zi-context-superopt with a stated result, positive or negative"
+    impact_note: "an answer to an open research question"
+
+  - id: t-315-zi-llm-kernels
+    issue: 315
+    title: "LLM-written kernels for the local decision path"
+    kind: experiment
+    tier: P3
+    rank: 11
+    status: open
+    gate: null
+    newcomer: false
+    needs_owner_approval: false
+    claim: exclusive
+    difficulty: L
+    expected_hours: 8
+    skills: [python, ml-eval, benchmarking]
+    toolchains: [python]
+    touches: [experiments/zi-llm-kernels/]
+    hardware: {gpu_vram_gib: 0, ram_gib: 8, disk_gib: 2, os: [linux, macos], arch: [x86_64, arm64]}
+    runtime: repo_only
+    network: other
+    risk_class: low
+    smoke: null
+    verifier: null
+    exit_criterion: "experiment receipt for zi-llm-kernels with a stated result, positive or negative"
+    impact_note: "an answer to an open research question"
+
+  - id: t-316-hz-memory-before-act
+    issue: 316
+    title: "Hermes: retrieve prior decisions before acting (restated-ask rate)"
+    kind: experiment
+    tier: P3
+    rank: 12
+    status: open
+    gate: null
+    newcomer: false
+    needs_owner_approval: false
+    claim: exclusive
+    difficulty: L
+    expected_hours: 8
+    skills: [python, ml-eval, benchmarking]
+    toolchains: [python]
+    touches: [experiments/hz-memory-before-act/]
+    hardware: {gpu_vram_gib: 0, ram_gib: 8, disk_gib: 2, os: [linux, macos], arch: [x86_64, arm64]}
+    runtime: repo_only
+    network: other
+    risk_class: low
+    smoke: null
+    verifier: null
+    exit_criterion: "experiment receipt for hz-memory-before-act with a stated result, positive or negative"
+    impact_note: "an answer to an open research question"
+
+  - id: t-317-hz-wait-compile
+    issue: 317
+    title: "Hermes: compile waits and polls out of frontier turns"
+    kind: experiment
+    tier: P3
+    rank: 13
+    status: open
+    gate: null
+    newcomer: false
+    needs_owner_approval: false
+    claim: exclusive
+    difficulty: L
+    expected_hours: 8
+    skills: [python, ml-eval, benchmarking]
+    toolchains: [python]
+    touches: [experiments/hz-wait-compile/]
+    hardware: {gpu_vram_gib: 0, ram_gib: 8, disk_gib: 2, os: [linux, macos], arch: [x86_64, arm64]}
+    runtime: repo_only
+    network: other
+    risk_class: low
+    smoke: null
+    verifier: null
+    exit_criterion: "experiment receipt for hz-wait-compile with a stated result, positive or negative"
+    impact_note: "an answer to an open research question"
+
+  - id: t-318-hz-done-proof-gate
+    issue: 318
+    title: "Hermes: no 'done' without a receipt (false-completion rate)"
+    kind: experiment
+    tier: P3
+    rank: 14
+    status: open
+    gate: null
+    newcomer: false
+    needs_owner_approval: false
+    claim: exclusive
+    difficulty: L
+    expected_hours: 8
+    skills: [python, ml-eval, benchmarking]
+    toolchains: [python]
+    touches: [experiments/hz-done-proof-gate/]
+    hardware: {gpu_vram_gib: 0, ram_gib: 8, disk_gib: 2, os: [linux, macos], arch: [x86_64, arm64]}
+    runtime: repo_only
+    network: other
+    risk_class: low
+    smoke: null
+    verifier: null
+    exit_criterion: "experiment receipt for hz-done-proof-gate with a stated result, positive or negative"
+    impact_note: "an answer to an open research question"
+
+  - id: t-319-hz-drift-detector
+    issue: 319
+    title: "Hermes: detect scope drift and substitution before the turn ends"
+    kind: experiment
+    tier: P3
+    rank: 15
+    status: open
+    gate: null
+    newcomer: false
+    needs_owner_approval: false
+    claim: exclusive
+    difficulty: L
+    expected_hours: 8
+    skills: [python, ml-eval, benchmarking]
+    toolchains: [python]
+    touches: [experiments/hz-drift-detector/]
+    hardware: {gpu_vram_gib: 0, ram_gib: 8, disk_gib: 2, os: [linux, macos], arch: [x86_64, arm64]}
+    runtime: repo_only
+    network: other
+    risk_class: low
+    smoke: null
+    verifier: null
+    exit_criterion: "experiment receipt for hz-drift-detector with a stated result, positive or negative"
+    impact_note: "an answer to an open research question"
