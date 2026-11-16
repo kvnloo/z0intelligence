@@ -95,6 +95,20 @@ def test_kanban_complete_is_gated(home):
     assert not blocked("kanban_complete", summary="Reviewed the plan; two questions filed.")
 
 
+def test_every_message_call_leaves_one_outcome_line(home):
+    """F24: block -> resend is measurable per session without reading any message text."""
+    say = lambda msg: G.on_pre_tool_call(tool_name="message_agent", args={"message": msg}, session_id="s9")  # noqa: E731
+    say("pushed 8b96606")
+    say("unverified: pushed 8b96606")
+    say("Done, all fixed.")
+    say("Two questions about the plan.")
+    rows = [json.loads(x) for x in (home / "owner-canon-gate" / "claim-calls.jsonl").read_text().splitlines()]
+    assert [(r["outcome"], r["typed"], r["unverified_lines"]) for r in rows] == [
+        ("block", True, 0), ("pass", False, 1), ("flag", False, 0), ("pass", False, 0)]
+    assert {r["session_id"] for r in rows} == {"s9"} and all("message" not in r for r in rows)
+    assert claim_rows(home)[0]["session_id"] == "s9"  # tool-path claim rows used to carry null
+
+
 def test_infra_failure_and_checker_bug_flag_only(home, monkeypatch):
     monkeypatch.setattr(G.claimcheck, "RUN", lambda cmd, env=None: (None, b"", "TimeoutExpired"))
     assert not blocked("message_agent", message="pushed kvnloo/x@8b96606")

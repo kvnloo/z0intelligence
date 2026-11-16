@@ -35,7 +35,9 @@ $HERMES_HOME/EXISTS.jsonl (id, name, where, seen_epoch); absent/invalid rows and
 Its action-slot log is $HERMES_HOME/owner-canon-gate/exists-injections.jsonl.
 DONE.jsonl adds flag-only plan/edit lookups, logged to owner-canon-gate/done-injections.jsonl.
 Receipts: $HERMES_HOME/owner-canon-gate/receipts.jsonl (law, tool, decision; no args) and
-claim-receipts.jsonl (one line per typed claim: tool, type, ok, detail; no message text).
+claim-receipts.jsonl (one line per typed claim: tool, type, ok, detail; no message text) and claim-calls.jsonl
+(one line per message-tool call: outcome pass|flag|block, claims, bad, unverified_lines, session_id), so a block
+followed in the same session by a pass shows whether the lane added a locator or wrote "unverified:".
 Other enforce rules fail closed per call: a classifier error blocks the call.
 """
 from __future__ import annotations
@@ -47,6 +49,7 @@ import os
 import re
 import shlex
 import subprocess
+import threading
 import time
 from pathlib import Path
 
@@ -92,6 +95,7 @@ _PUBLIC = re.compile(r"(?i)\b(gh\s+(pr|issue)\s+(create|comment)\b[^\n]*--repo[ 
 _DONE = re.compile(r"(?i)\b(done|fixed|finished|complete[d]?|works now|verified|shipped|resolved)\b")
 _QUOTA = re.compile(r"(?i)(\b429\b|rate.?limit|quota|too many requests|usage limit|retry-after)")
 _last_limited: dict[str, float] = {}
+_call = threading.local()  # session_id of the tool call being judged, for the claim receipts
 
 
 def _home() -> Path:
@@ -316,6 +320,7 @@ def reuse_facts(tool: str, args: dict) -> tuple[bool, bool, str]:
 def checked_claims(tool: str, msg: str, session_id=None) -> list[dict]:
     """Typed claims in msg, each dereferenced by claimcheck and written to claim-receipts.jsonl (no message text)."""
     claims = claimcheck.check(msg, str(_home()))
+    session_id = session_id or getattr(_call, "session_id", None)
     for c in claims:
         _receipt({"tool": tool, "type": c["type"], "ok": c["ok"] is True, "detail": c["detail"],
                   "session_id": session_id}, "claim-receipts.jsonl")
@@ -323,6 +328,16 @@ def checked_claims(tool: str, msg: str, session_id=None) -> list[dict]:
 
 
 def claim_facts(tool: str, msg: str) -> tuple[bool, bool, str, bool]:
+    """claim_verdict plus one claim-calls.jsonl line for the call (counts only, no message text)."""
+    trigger, cleared, why, flag_only = verdict = claim_verdict(tool, msg)
+    _receipt({"tool": tool, "outcome": "pass" if cleared or not trigger else "flag" if flag_only or _mode(
+        "done_needs_receipt") != "enforce" else "block", "typed": why != "done claim with nothing checkable" and trigger,
+        "unverified_lines": sum(ln.strip().lstrip("-*•> ").lower().startswith("unverified:") for ln in msg.splitlines()),
+        "session_id": getattr(_call, "session_id", None)}, "claim-calls.jsonl")
+    return verdict
+
+
+def claim_verdict(tool: str, msg: str) -> tuple[bool, bool, str, bool]:
     """(trigger, cleared, why, flag_only) for done_needs_receipt. Blocks only on a typed claim that was checked
     and failed, or that names nothing to check."""
     try:
@@ -458,6 +473,7 @@ def decide(tool: str, args: dict) -> tuple[bool, list[tuple[str, str]]]:
 
 def on_pre_tool_call(tool_name: str = "", args: dict | None = None, **kw):
     args = args or {}
+    _call.session_id = kw.get("session_id")
     try:
         raw = json.dumps(args, default=str)
         target = str(args.get("path") or "") if isinstance(args, dict) else ""

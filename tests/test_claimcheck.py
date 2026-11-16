@@ -228,3 +228,61 @@ def test_short_pr_reference_is_a_locator(fake):
     assert c["ok"] is True and c["locator"] == "https://github.com/kvnloo/glide/pull/229"
     answers["pulls/155"] = (0, b"open false 496a8ca8aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n", "")
     assert one("kvnloo/.files #155 merged as 496a8ca8", "merged")["detail"] == "PR #155 is open, not merged"
+
+
+# F24: false-positive classes seen in the first 2 h of live traffic (2026-11-11), reduced to their shape.
+def test_f24_hex_elsewhere_in_the_paragraph_is_not_the_pr_head(fake):
+    fake[1]["pulls/233"] = (0, b"open false d6a4aaf06aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n", "")
+    c = one("Ran it in session local-3116e038… and it returned 3 hits. kvnloo/glide#233 has the fix and is "
+            "still open; its branch went into the union branch as commit eb09c59.", "pr")
+    assert c["ok"] is True, c
+    C._cache.clear()  # a sha written right after the PR reference is still its head
+    assert "head is" in one("The fix is kvnloo/glide#233 at head 0123abc.", "pr")["detail"]
+
+
+def test_f24_merged_into_a_side_branch_is_not_pr_merged(fake):
+    fake[1]["pulls/233"] = (0, b"open false d6a4aaf06aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n", "")
+    c = one("PR kvnloo/glide#233 has the screenshot and is merged into preview (eb09c59).", "merged")
+    assert c["ok"] is True, c
+    assert C.check("The fixes are merged to `kvnloo/.files` dev and active in the release.") == []
+    C._cache.clear()
+    assert one("kvnloo/glide#233 is merged into main", "merged")["detail"] == "PR #233 is open, not merged"
+
+
+def test_f24_merged_pr_cited_by_its_squash_sha(fake):
+    fake[1]["pulls/232"] = (0, b"closed true fbd8d6dceaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n", "")
+    assert one("kvnloo/glide#232 (0a1b2c3) is merged", "merged")["ok"] is True
+
+
+@pytest.mark.parametrize("text", [
+    "The cause: the PR never found that deployed reader, so recall fell back.",   # adjective, not a deploy claim
+    "The deployed stdlib reader is at the usual place.",
+    "The bug was already fixed on main by upstream #4643.",                       # a location, not a merge claim
+    "It fails on main with the source reverted (#88).",
+])
+def test_f24_adjectives_and_locations_are_not_claims(text):
+    assert C.check(text) == []
+
+
+def test_f24_deploy_and_on_main_claims_still_fire():
+    assert one("I fixed and deployed four bugs", "deployed")["ok"] is None
+    assert one("the fix is on main (#12)", "merged")["ok"] is None
+
+
+def test_f24_pushed_header_takes_the_locators_listed_below(fake):
+    calls, answers = fake
+    answers["commits/b321765"] = (0, b"b321765aaa\n", "")
+    answers["commits/82931c5"] = (1, b"", "gh: No commit found (HTTP 422)")
+    got = C.check("**New this run**, both tested and pushed to the fork:\n"
+                  "- one thing. Commit: `kvnloo/hermes-agent@b321765`.\n"
+                  "- another. Commit: `kvnloo/hermes-agent@82931c5`.\n\nNot sent yet: 3742f51.")
+    assert [(c["type"], c["ok"]) for c in got] == [("pushed", True), ("pushed", False)], got
+
+
+def test_f24_a_named_commit_is_checked_whatever_the_verb(fake):
+    calls, answers = fake
+    answers["commits/b321765"] = (1, b"", "gh: No commit found (HTTP 422)")
+    assert one("Two slices are on the fork: kvnloo/hermes-agent@b321765 (13F→70P)", "pushed")["ok"] is False
+    assert C.check("kvnloo/hermes-agent@b321765 is committed locally, not pushed") == []
+    assert C.check("unverified: kvnloo/hermes-agent@b321765 is on the fork") == []
+    assert [c["type"] for c in C.check("the worktree commit /srv/repo@b321765 stays local")] == []
