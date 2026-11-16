@@ -6,6 +6,7 @@ current user message at API time). The z0int side is the real ``python -m z0int.
 """
 from __future__ import annotations
 
+import gc
 import hashlib
 import json
 import os
@@ -92,9 +93,19 @@ def test_shadow_hook_returns_without_waiting_and_the_request_is_identical_to_off
     off = request(start(mod, {'memory_inject': 'off', 'z0int_python': sys.executable}, monkeypatch))
     ctx = start(mod, {'memory_inject': 'shadow', 'z0int_python': slow_python(env)}, monkeypatch)
     assert len(ctx.hooks['pre_llm_call']) == 1
-    t0 = time.perf_counter()
-    shadow = request(ctx, turn='t-slow')
-    assert time.perf_counter() - t0 < 0.02
+    # Unguarded, this failed at ~0.2 s on CI py3.13 depending on what earlier tests allocated:
+    # keep automatic GC out of the 20 ms window (the bound itself is unchanged).
+    gc.collect()
+    was = gc.isenabled()
+    gc.disable()
+    try:
+        t0 = time.perf_counter()
+        shadow = request(ctx, turn='t-slow')
+        elapsed = time.perf_counter() - t0
+    finally:
+        if was:
+            gc.enable()
+    assert elapsed < 0.02
     assert shadow == off
 
 
