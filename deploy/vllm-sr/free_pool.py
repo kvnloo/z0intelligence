@@ -392,8 +392,13 @@ def pool_rows():
 
 
 def ctx_open(row):
-    """The context sizing stopped on a rate limit/overload (429, 5xx), not on a size error: the cap is unmeasured."""
-    return "max_ok_tokens" in row and any(row.get(f"ctx_{n}") in TRANSIENT for n in SIZES)
+    """The cap is unmeasured: the next size up stopped on a rate limit/overload (429, 5xx), or left no status
+    at all (rows rewritten before the evidence was kept). Only a real size error there proves the cap."""
+    ok = row.get("max_ok_tokens")
+    if ok is None or ok >= SIZES[-1]:
+        return False
+    nxt = row.get(f"ctx_{min(n for n in SIZES if n > ok)}")
+    return nxt is None or nxt in TRANSIENT
 
 
 def reprobe(st, now, cands=None):
