@@ -1,0 +1,10 @@
+[Unit]
+Description=free-scout: daily free-LLM provider scan into the signup queue (free_pool.py scout)
+
+[Service]
+Type=oneshot
+Environment=PATH=%h/.local/bin:/usr/local/bin:/usr/bin
+ExecStart=%h/.hermes/hermes-agent/venv/bin/python /mnt/zer0models/z0-wt/z0int-sr-lanes/deploy/vllm-sr/free_pool.py scout
+TimeoutStartSec=2400
+Nice=19
+IOSchedulingClass=idle

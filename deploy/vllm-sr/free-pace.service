@@ -5,6 +5,6 @@ Description=free-pace: track free-model rate limits from router traffic; pull ca
 Type=oneshot
 Environment=KUBECONFIG=%h/.kube/k3s.yaml
 Environment=PATH=%h/.local/bin:/usr/local/bin:/usr/bin
-ExecStart=%h/.hermes/hermes-agent/venv/bin/python /mnt/zer0models/z0-wt/z0int-sr-lanes/deploy/vllm-sr/free_pool.py pace
+ExecStart=%h/.hermes/hermes-agent/venv/bin/python /mnt/zer0models/workspace/zer0/oss/tools/dsh-env-exec.py --allow GROQ_API_KEY --allow CEREBRAS_API_KEY --allow NVIDIA_API_KEY --allow OPENROUTER_API_KEY --allow SAMBANOVA_API_KEY --allow COHERE_API_KEY --allow ZAI_API_KEY --allow SILICONFLOW_API_KEY -- %h/.hermes/hermes-agent/venv/bin/python /mnt/zer0models/z0-wt/z0int-sr-lanes/deploy/vllm-sr/free_pool.py pace
 TimeoutStartSec=700
 Nice=10

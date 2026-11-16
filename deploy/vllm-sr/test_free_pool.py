@@ -5,6 +5,15 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import free_pool as fp  # noqa: E402
+import pytest  # noqa: E402
+
+
+@pytest.fixture(autouse=True)
+def _no_live_state(monkeypatch, tmp_path):
+    # Tests render from the committed seed probe, never from this host's live re-probe or inventory.
+    monkeypatch.setattr(fp, "POOL", tmp_path / "no-live-pool.json")
+    monkeypatch.setattr(fp, "INVENTORY", tmp_path / "no-inventory")
+    monkeypatch.setattr(fp, "CATALOGS", tmp_path / "no-catalogs.json")
 
 GROQ_TPD = ("Rate limit reached for model `openai/gpt-oss-20b` in organization `org_x` service tier `on_demand` on "
             "tokens per day (TPD): Limit 200000, Used 199645, Requested 1234. Please try again in 7m12.5s.")
@@ -200,3 +209,118 @@ def test_undecodable_402_on_pinned_endpoint_blocks_backend():
     assert "402" in st["blocked"]["samba-glm-5.3"]["why"]
     fp.ingest(st, lines, now=1_800_000_060)  # re-read log window: counted once
     assert sum(1 for e in st["events"] if e[1] == "samba-glm-5.3") == 1
+
+
+def _inventory(tmp_path, models):
+    d = tmp_path / "inv"
+    d.mkdir()
+    (d / "2026-11-15.json").write_text(json.dumps({"providers": {"openrouter": {"models": models}}}))
+    return d
+
+
+def test_new_free_models_join_the_router_without_a_code_edit(tmp_path, monkeypatch):
+    # Owner 11-15: autoscale across ALL free models; a model that turns free must not wait for a hand edit.
+    monkeypatch.setattr(fp, "INVENTORY", _inventory(tmp_path, [
+        {"id": "acme/new-1:free", "class": "free", "context_length": 65536},
+        {"id": "acme/paid-1", "class": "paid"},
+        {"id": "google/gemma-4-31b-it:free", "class": "free"},          # no-Google owner rule
+        {"id": "openai/gpt-5.5:free", "class": "free"},                 # closed models have their own routes
+        {"id": "nvidia/nemotron-3-ultra-550b-a55b:free", "class": "free"},  # already a candidate
+    ]))
+    fp.CATALOGS.write_text(json.dumps({"nim": ["acme/nim-chat-2", "nvidia/nemotron-3.5-embed-8b", "openai/gpt-oss-20b"]}))
+    assert [c[0] for c in fp.discovered()] == ["or-new-1", "kilo-new-1", "nim-nim-chat-2"]  # embed and known ids skipped
+    assert {c[3] for c in fp.discovered()} == {"acme/new-1:free", "acme/nim-chat-2"}
+    seed = json.loads((fp.HERE / "pool.json").read_text())
+    seed["rows"].append({"name": "or-new-1", "tool_call": True, "tool_s": 2.0, "max_ok_tokens": 30000})
+    fp.POOL.write_text(json.dumps(seed))
+    import yaml
+    out = tmp_path / "c.yaml"
+    fp.render(out=out)
+    c = yaml.safe_load(out.read_text())
+    assert "or-new-1" in [m["name"] for m in c["providers"]["models"]]
+    assert "vllm-sr/m/new-1" in {n for e in c["entrypoints"] for n in e["model_names"]}
+
+
+def test_reprobe_skips_blocked_backends_and_reuses_known_context(tmp_path, monkeypatch):
+    # Never poll an exhausted provider (owner rule); a known context window is not re-measured with 100K prompts.
+    now = 1_800_000_000.0
+    fp.POOL.write_text(json.dumps({"rows": [{"name": "groq-gpt-oss-20b", "tool_call": True, "max_ok_tokens": 30000},
+                                            {"name": "samba-glm-5.3", "tool_status": 402}]}))
+    calls = []
+    monkeypatch.setattr(fp, "probe", lambda c, sizes=True: calls.append((c[0], sizes)) or {"name": c[0], "tool_call": True, "tool_s": 1.0})
+    rows = fp.reprobe({"blocked": {"samba-glm-5.3": {"until": now + 3600, "why": "402"}}}, now,
+                      cands=[c for c in fp.CANDIDATES if c[0] in ("groq-gpt-oss-20b", "samba-glm-5.3", "nim-kimi-k2.6")])
+    assert ("groq-gpt-oss-20b", False) in calls and ("nim-kimi-k2.6", True) in calls
+    assert "samba-glm-5.3" not in [n for n, _ in calls]
+    by = {r["name"]: r for r in rows}
+    assert by["samba-glm-5.3"]["tool_status"] == 402 and by["groq-gpt-oss-20b"]["max_ok_tokens"] == 30000
+    monkeypatch.setattr(fp, "probe", lambda c, sizes=True: {"name": c[0], "tool_status": "no-key"})
+    rows = fp.reprobe({}, now, cands=[c for c in fp.CANDIDATES if c[0] == "groq-gpt-oss-20b"])
+    assert fp.alive(rows[0])  # a prober without the key never drops a working backend
+
+
+def test_pace_refuses_a_reprobe_that_kills_half_the_pool(monkeypatch):
+    # 11-15 live: a prober without keys marked 36 of 43 backends dead and shrank the router to 7. Never again.
+    st_file = fp.POOL.parent / "free-pace.json"
+    monkeypatch.setattr(fp, "OUT", st_file)
+    monkeypatch.setattr(fp, "STATE", fp.POOL.parent)
+    monkeypatch.setattr(fp, "pod_log", lambda s: [])
+    monkeypatch.setattr(fp, "reprobe", lambda st, now: [{"name": "groq-gpt-oss-20b", "tool_call": True, "tool_s": 1.0}])
+    deploys = []
+    monkeypatch.setattr(fp, "render", lambda **k: deploys.append(k))
+    monkeypatch.setattr(fp.subprocess, "run", lambda *a, **k: deploys.append(a))
+    monkeypatch.setattr(sys, "argv", ["free_pool.py", "pace"])
+    st_file.write_text(json.dumps({"pool": sorted(n for n, r in fp.pool_rows().items() if fp.alive(r))}))
+    fp.pace()
+    assert not deploys and not fp.POOL.exists()
+
+
+def test_scout_queues_only_unseen_providers():
+    queue = [{"domain": "openrouter.ai", "state": "done"}]
+    found = [{"domain": "openrouter.ai", "status": "open_catalog"},
+             {"domain": "newfree.ai", "status": "open_catalog", "base_url": "https://api.newfree.ai/v1", "lists": 3,
+              "free_ids": ["a/b:free", "google/gemma-x:free"]},
+             {"domain": "keyed.ai", "status": "needs_key", "lists": 2},
+             {"domain": "dead.ai", "status": "unreachable"},
+             {"domain": "gemini.google.com", "status": "needs_key"}]
+    new = fp.merge_scan(queue, found, "20261115")
+    assert [(r["domain"], r["free_models"], r["keyless"], r["state"]) for r in new] == [
+        ("newfree.ai", 1, True, "todo"), ("keyed.ai", 0, False, "todo")]
+
+
+def test_pace_retries_a_failed_deploy_next_minute(monkeypatch):
+    # 11-15 live: helm timed out after a re-probe grew the pool, and nothing retried for 6 h.
+    monkeypatch.setattr(fp, "OUT", fp.POOL.parent / "free-pace.json")
+    monkeypatch.setattr(fp, "STATE", fp.POOL.parent)
+    monkeypatch.setattr(fp, "pod_log", lambda s: [])
+    monkeypatch.setattr(fp, "render", lambda **k: None)
+    rcs = [1, 0]
+
+    class R:
+        def __init__(self):
+            self.returncode, self.stdout, self.stderr = rcs.pop(0), "", ""
+    monkeypatch.setattr(fp.subprocess, "run", lambda *a, **k: R())
+    monkeypatch.setattr(sys, "argv", ["free_pool.py", "pace"])
+    fp.POOL.write_text(json.dumps({"rows": [{"name": "groq-gpt-oss-20b", "tool_call": True, "tool_s": 1.0}]}))
+    fp.OUT.write_text(json.dumps({"probed_at": 1e12, "pool": []}))
+    fp.pace()
+    assert json.loads(fp.OUT.read_text())["pool"] == []           # failed: not recorded as deployed
+    fp.pace()
+    assert json.loads(fp.OUT.read_text())["pool"] == ["groq-gpt-oss-20b"] and not rcs
+
+
+def test_no_decision_exceeds_the_routers_32_candidate_limit(tmp_path):
+    # 11-15 live: autoscale grew the pool to 38 and the router crash-looped on "exceeding ... limit of 32".
+    import yaml
+    seed = json.loads((fp.HERE / "pool.json").read_text())
+    rows = {r["name"]: r for r in seed["rows"]}
+    for c in fp.CANDIDATES:
+        rows[c[0]] = {"name": c[0], "tool_call": True, "tool_s": 1.0, "max_ok_tokens": 30000}
+    fp.POOL.write_text(json.dumps({"rows": list(rows.values())}))
+    out = tmp_path / "c.yaml"
+    fp.render(out=out)
+    c = yaml.safe_load(out.read_text())
+    decisions = c["routing"]["decisions"] + [d for r in c["recipes"] for d in r["routing"]["decisions"]]
+    assert len(c["providers"]["models"]) > fp.MAX_REFS
+    assert max(len(d["modelRefs"]) for d in decisions) <= fp.MAX_REFS
+    assert all(d["fallback"]["max_attempts"] <= fp.MAX_REFS for d in decisions if d["fallback"]["enabled"])
