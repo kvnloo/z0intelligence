@@ -1,7 +1,9 @@
 """Smoke tests for the ported jevlike trainable scorers."""
 
-import torch
-from torch.nn import functional as F
+import pytest
+
+torch = pytest.importorskip("torch")  # ML stack is the optional `ml` extra
+from torch.nn import functional as F  # noqa: E402
 
 from openjev_phase1.jevlike.data import ByteCollator, synthetic_example
 from openjev_phase1.jevlike.model import TinyScorer

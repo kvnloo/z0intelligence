@@ -31,9 +31,9 @@ fi
 # shellcheck disable=SC1091
 source "$VENV/bin/activate"
 
-banner "Installing OpenJev editable (.[test])"
+banner "Installing OpenJev editable (.[test,ml])"
 pip install -q -U pip
-pip install -q -e "$OPENJEV_DIR[test]"
+pip install -q -e "$OPENJEV_DIR[test,ml]"
 
 if [[ "${SKIP_EVOLUTION_LAB:-0}" == "1" ]]; then
   banner "SKIP_EVOLUTION_LAB=1 — OpenJev-only install complete"
