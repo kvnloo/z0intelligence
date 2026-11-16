@@ -420,6 +420,38 @@ def locate_transcript(session_id: str, base: Path | None = None) -> tuple[Path |
     return (p, 'agentsview_index') if p else (None, None)
 
 
+def locate_transcripts(session_ids: Iterable[str | None], base: Path | None = None) -> dict[str, tuple[Path | None, str | None]]:
+    """``locate_transcript`` for many sessions with one listing per projects tree instead of one glob per session.
+
+    Same sources and precedence: trees in ``projects_dirs()`` order (or only ``base``), the sorted-first project dir
+    within a tree, then the AgentsView index for the rest (never with ``base``).
+    """
+    want = {sid for sid in session_ids if sid}
+    trees = [(base, 'projects_dir')] if base is not None else [
+        (d, 'projects_dir' if i == 0 else 'extra_projects_dir') for i, d in enumerate(projects_dirs())]
+    out: dict[str, tuple[Path | None, str | None]] = {}
+    for tree, how in trees:
+        try:
+            subs = sorted(p for p in tree.iterdir() if p.is_dir())
+        except OSError:
+            continue
+        for sub in subs:
+            try:
+                names = os.listdir(sub)
+            except OSError:
+                continue
+            for name in names:
+                sid = name[:-6] if name.endswith('.jsonl') else None
+                if sid in want and sid not in out:
+                    out[sid] = (sub / name, how)
+    if base is None and want - out.keys():
+        from . import agentsview_ro
+        for sid in want - out.keys():
+            if p := agentsview_ro.claude_transcript(sid):
+                out[sid] = (p, 'agentsview_index')
+    return {sid: out.get(sid, (None, None)) for sid in want}
+
+
 def find_transcript(session_id: str, base: Path | None = None) -> Path | None:
     return locate_transcript(session_id, base)[0]
 
@@ -952,10 +984,8 @@ def verify(*, root: Path | None = None, since: float = 0.0, all_turns: bool = Fa
     sdir = state_dir(root)
     observed = [r for r in read_jsonl(sdir / 'outcomes.jsonl') if r.get('schema') == OBSERVED_SCHEMA]
     obs_by_key = {(r.get('session_id'), r.get('trace_id')): r for r in observed}
-    sessions: dict[str, Path | None] = {}
-    for sid, _ in obs_by_key:
-        if sid:
-            sessions[sid] = find_transcript(sid, projects)
+    hits = locate_transcripts((sid for sid, _ in obs_by_key), projects)
+    sessions: dict[str, Path | None] = {sid: hits[sid][0] for sid, _ in obs_by_key if sid}
     if all_turns:
         base = projects or projects_dir()
         for path in sorted(base.glob('*/*.jsonl')):
@@ -1146,7 +1176,7 @@ def verify_harness(harness: str, *, root: Path | None = None, agentsview: str | 
                       now=now, extra_repo_roots=extra_repo_roots, density=density)
         sids = {r.get('session_id') for name in ('opportunities.jsonl', 'outcomes.jsonl')
                 for r in read_jsonl(state_dir(root) / name)} - {None}
-        found = Counter(locate_transcript(sid, projects)[1] or 'missing' for sid in sids)
+        found = Counter(how or 'missing' for _, how in locate_transcripts(sids, projects).values())
         if sids and found['missing'] == len(sids):
             failures.append(_failure(harness, 'label_source_empty', {
                 'resolved_dir': str(projects or projects_dir()), 'searched_dirs': 1 if projects else len(projects_dirs()),
