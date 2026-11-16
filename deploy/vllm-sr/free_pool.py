@@ -258,7 +258,8 @@ def eval_scores():
     Quality is the model's, not the host's, so one score covers every provider serving that model."""
     sys.path.insert(0, str(HERE / "profiles"))
     from score import score
-    rows = [json.loads(l) for l in (HERE / "profiles/results.jsonl").read_text().splitlines() if l.strip()]
+    res = HERE / "profiles/results.jsonl"  # local eval output, not in git: a fresh install ranks by headroom only
+    rows = [json.loads(l) for l in res.read_text().splitlines() if l.strip()] if res.exists() else []
     out = {}
     for key, v in score(rows).items():
         if v["provider"] != "router" and (v["n_hard"] or 0) >= 8:
@@ -390,6 +391,11 @@ def pool_rows():
     return {}
 
 
+def ctx_open(row):
+    """The context sizing stopped on a rate limit/overload (429, 5xx), not on a size error: the cap is unmeasured."""
+    return "max_ok_tokens" in row and any(row.get(f"ctx_{n}") in TRANSIENT for n in SIZES)
+
+
 def reprobe(st, now, cands=None):
     """Tool-probe every candidate again; a bucket blocked now keeps its last row (never poll an exhausted
     provider), a known context window is reused, only new backends get the 6K/30K/100K sizing."""
@@ -399,14 +405,15 @@ def reprobe(st, now, cands=None):
     blocked = {b for b, v in st.get("blocked", {}).items() if v["until"] > now}
     todo = [c for c in cands if bucket(c[0]) not in blocked or c[0] not in old]
     with cf.ThreadPoolExecutor(8) as ex:
-        fresh = dict(zip([c[0] for c in todo], ex.map(lambda c: probe(c, sizes="max_ok_tokens" not in old.get(c[0], {})), todo)))
+        fresh = dict(zip([c[0] for c in todo], ex.map(lambda c: probe(c, sizes="max_ok_tokens" not in old.get(c[0], {})
+                                                                                        or ctx_open(old.get(c[0], {}))), todo)))
     rows = []
     for c in cands:
         r = fresh.get(c[0])
         if not r or r.get("tool_status") == "no-key":  # the prober's env lacks the key: that says nothing about the backend
             r = old.get(c[0], {"name": c[0]})
         if r.get("tool_call") and "max_ok_tokens" not in r and "max_ok_tokens" in old.get(c[0], {}):
-            r["max_ok_tokens"] = old[c[0]]["max_ok_tokens"]
+            r.update({k: v for k, v in old[c[0]].items() if k == "max_ok_tokens" or k.startswith("ctx_")})  # + evidence
         rows.append(r)
     return rows
 
@@ -441,7 +448,7 @@ def render(exclude=(), out=HERE / "config.yaml"):
         models.append({"name": name, "provider_model_id": model, "backend_refs": [backend]})
         ok = pool[name].get("max_ok_tokens", 0)
         # A probe that passed the largest size proved nothing past it: trust the published window there.
-        ctx = claimed if ok == SIZES[-1] else (max(ok, 4000) if pool[name].get("tool_call") else SMALL_CAP)
+        ctx = claimed if ok == SIZES[-1] or ctx_open(pool[name]) else (max(ok, 4000) if pool[name].get("tool_call") else SMALL_CAP)
         cards.append({"name": name, "context_window_size": ctx})
         refs.append({"model": name, "use_reasoning": False})
     # turbo = same pool, fastest measured tool turn first (unmeasured last).
@@ -739,6 +746,11 @@ def audit(lines):
             "ok": not why, "why": "; ".join(why) or "R1 spread, R2 no failures"}
 
 
+def cards():
+    """The per-backend context the router is told (alive rows only): a change here must redeploy."""
+    return {n: r.get("max_ok_tokens") for n, r in sorted(pool_rows().items()) if alive(r)}
+
+
 def pace():
     now = time.time()
     try:
@@ -746,6 +758,7 @@ def pace():
     except (OSError, ValueError):
         st = {}
     st.setdefault("events", []), st.setdefault("blocked", {})
+    st.setdefault("cards", cards())  # baseline before any re-probe, so a re-sized card below redeploys
     since = min(now - st.get("cursor", now - HOUR), DAY) + 30
     lines = pod_log(since)
     ingest(st, lines, now)
@@ -768,14 +781,15 @@ def pace():
             print("re-probed:", len(names), "backends alive")
         st["probed_at"] = now
     # Desired vs deployed, every minute: a deploy that failed (helm timeout) is retried next tick, not in 6 h.
-    pool_names = sorted(n for n, r in pool_rows().items() if alive(r))
-    changed = want != st.get("excluded", []) or pool_names != st.get("pool", [])
+    pool_names, now_cards = sorted(n for n, r in pool_rows().items() if alive(r)), cards()
+    # A re-probe that only re-sizes a card (6K -> 128K) keeps the same names, and must still redeploy.
+    changed = want != st.get("excluded", []) or pool_names != st.get("pool", []) or now_cards != st["cards"]
     if changed and "--dry-run" not in sys.argv:
         render(exclude=set(want), out=LIVE_CFG)
         r = subprocess.run([str(HERE / "deploy.sh"), str(LIVE_CFG)], capture_output=True, text=True, timeout=600)
         st["deploy"] = {"at": now, "rc": r.returncode, "excluded": want, "tail": r.stdout[-300:] + r.stderr[-300:]}
         if r.returncode == 0:  # a failed deploy keeps the old state, so the next minute retries it
-            st["excluded"], st["pool"] = want, pool_names
+            st["excluded"], st["pool"], st["cards"] = want, pool_names, now_cards
     st["at"] = datetime.fromtimestamp(now).astimezone().isoformat(timespec="seconds")
     st["usage"] = usage
     STATE.mkdir(parents=True, exist_ok=True)

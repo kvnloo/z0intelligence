@@ -84,8 +84,11 @@ def test_weights_spread_by_bucket_capacity_and_eval():
     assert [r["model"] for r in fp.weigh(refs, q.get)] == [r["model"] for r in refs]  # fallback order kept
 
 
-def test_free_entrypoint_routes_task_keywords_to_family_decisions():
+def test_free_entrypoint_routes_task_keywords_to_family_decisions(monkeypatch):
     import yaml, tempfile
+    # Hermetic: every candidate evaluated equally (profiles/results.jsonl is local, not in git).
+    v = {"quality_hard": 0.8, "reliability": 1.0, "family_acc": {f: 0.8 for f in fp.FAMILIES}}
+    monkeypatch.setattr(fp, "eval_scores", lambda: {c[3].split("/")[-1].removesuffix(":free"): v for c in fp.CANDIDATES})
     out = Path(tempfile.mkdtemp()) / "c.yaml"
     fp.render(out=out)
     c = yaml.safe_load(out.read_text())
@@ -259,6 +262,23 @@ def test_reprobe_skips_blocked_backends_and_reuses_known_context(tmp_path, monke
     assert fp.alive(rows[0])  # a prober without the key never drops a working backend
 
 
+def test_a_rate_limited_size_probe_never_caps_context(tmp_path, monkeypatch):
+    # nim-step-5-preview got 429 at the 30K size probe and was capped at 6K, so the router 422'd every Hermes turn.
+    now = 1_800_000_000.0
+    hit = {"name": "nim-step-5-preview", "tool_call": True, "tool_s": 1.0, "max_ok_tokens": 6000, "ctx_30000": 429}
+    small = {"name": "groq-gpt-oss-20b", "tool_call": True, "tool_s": 1.0, "max_ok_tokens": 6000, "ctx_30000": 413}
+    assert fp.ctx_open(hit) and not fp.ctx_open(small)  # 413 is a real size limit, 429 says nothing about size
+    fp.POOL.write_text(json.dumps({"rows": [hit, small]}))
+    calls = []
+    monkeypatch.setattr(fp, "probe", lambda c, sizes=True: calls.append((c[0], sizes)) or {"name": c[0], "tool_call": True, "tool_s": 1.0})
+    fp.reprobe({}, now, cands=[c for c in fp.CANDIDATES if c[0] in ("nim-step-5-preview", "groq-gpt-oss-20b")])
+    assert ("nim-step-5-preview", True) in calls and ("groq-gpt-oss-20b", False) in calls  # re-measure only the unmeasured
+    assert not fp.ctx_open({"name": "x", "tool_call": True, "ctx_6000": 429})  # nothing measured: keep the small default
+    fp.POOL.write_text(json.dumps({"rows": [small]}))
+    rows = fp.reprobe({}, now, cands=[c for c in fp.CANDIDATES if c[0] == "groq-gpt-oss-20b"])
+    assert rows[0]["ctx_30000"] == 413  # a reused cap keeps the evidence it was measured with
+
+
 def test_pace_refuses_a_reprobe_that_kills_half_the_pool(monkeypatch):
     # 11-15 live: a prober without keys marked 36 of 43 backends dead and shrank the router to 7. Never again.
     st_file = fp.POOL.parent / "free-pace.json"
@@ -308,6 +328,31 @@ def test_pace_retries_a_failed_deploy_next_minute(monkeypatch):
     assert json.loads(fp.OUT.read_text())["pool"] == []           # failed: not recorded as deployed
     fp.pace()
     assert json.loads(fp.OUT.read_text())["pool"] == ["groq-gpt-oss-20b"] and not rcs
+
+
+def test_pace_redeploys_when_a_reprobe_only_resizes_a_card(monkeypatch):
+    # 11-16: a 429 had carded step-5-preview at 6K; the fixed re-probe re-sized it, but the alive set was
+    # unchanged, so pace never redeployed and the router kept answering 422 context_length_exceeded.
+    monkeypatch.setattr(fp, "OUT", fp.POOL.parent / "free-pace.json")
+    monkeypatch.setattr(fp, "STATE", fp.POOL.parent)
+    monkeypatch.setattr(fp, "pod_log", lambda s: [])
+    monkeypatch.setattr(fp, "render", lambda **k: None)
+    deploys = []
+
+    class R:
+        returncode, stdout, stderr = 0, "", ""
+    monkeypatch.setattr(fp.subprocess, "run", lambda *a, **k: deploys.append(a) or R())
+    monkeypatch.setattr(sys, "argv", ["free_pool.py", "pace"])
+    row = {"name": "groq-gpt-oss-20b", "tool_call": True, "tool_s": 1.0, "max_ok_tokens": 6000}
+    fp.POOL.write_text(json.dumps({"rows": [row]}))
+    fp.OUT.write_text(json.dumps({"probed_at": 1e12, "pool": ["groq-gpt-oss-20b"], "excluded": []}))
+    fp.pace()
+    assert not deploys                                              # nothing changed: no deploy
+    fp.POOL.write_text(json.dumps({"rows": [dict(row, max_ok_tokens=131072)]}))
+    fp.pace()
+    assert len(deploys) == 1 and json.loads(fp.OUT.read_text())["cards"] == {"groq-gpt-oss-20b": 131072}
+    fp.pace()
+    assert len(deploys) == 1                                        # deployed state recorded: no repeat
 
 
 def test_no_decision_exceeds_the_routers_32_candidate_limit(tmp_path):

@@ -1,0 +1,6 @@
+name: sr
+version: "0.1.0"
+description: "Free semantic router (vllm-sr): status, turbo, lane plans, a fanout bench, and tiered onboarding of free-provider keys into the Hermes .env or Bitwarden Secrets Manager."
+author: "kvnloo / Hermes Agent"
+license: MIT
+manifest_version: 2
