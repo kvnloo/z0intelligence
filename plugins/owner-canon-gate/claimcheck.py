@@ -8,7 +8,7 @@ check(text, profile_home=None) -> [{type, locator, ok, detail}]
 The writer never supplies the command. A claim names a locator and this module runs the fixed check for its type:
   path      /abs/path on a done/receipt/report/log line    exists on this host (lines about another host are skipped)
   pushed    owner/repo@sha or /repo/path@sha               a remote branch (or GitHub) has the commit
-  merged    PR URL, or repo@sha                            PR merged, or the default branch contains the commit
+  merged    PR URL, or repo@sha                            PR merged, or the named/default branch contains the commit
   pr        https://github.com/O/R/pull/N or O/R#N         PR is open or merged; head sha matches when one is given
   tests     /abs/junit.xml or /abs/pytest.log, or O/R@sha  0 failures, 0 errors, count equals the claim, under 24 h old
   deployed  URL, optional "sha256 <hex>"                   HTTP 200 and the served body hash matches
@@ -50,6 +50,8 @@ _MERGED = re.compile(r"(?i)\b(merged|(?:is|are|was|now|landed|lands|already) on 
 # "merged into preview": a side-branch merge says nothing about the PR being merged or the default branch
 _SIDE_BRANCH = re.compile(r"(?i)\s+(?:in)?to\s+(?:the\s+)?[`'\"]?(?!(?:origin/)?(?:main|master|trunk)\b|default\b|upstream\b|"
                           r"its\b|their\b)[\w./-]+")
+# ...but "repo@sha merged into <branch>" is checkable against that branch
+_MERGED_INTO = re.compile(r"(?i)\bmerged\s+into\s+[`'\"]?((?!its\b)[\w][\w./-]*)")
 # a PR's head sha is the one written right after the PR reference, never a hex run elsewhere in the paragraph
 _HEAD_AFTER = re.compile(r"[\s(,`]*(?:(?:at|@|head|commit|sha)[\s:`]*){0,2}(?=[0-9]*[a-f])(" + _SHA + r")(?![\w…-])")
 # "merged" is a PR/branch claim only next to one; "merged into its version" is a file edit
@@ -126,17 +128,20 @@ def _check_pushed(repo: str, sha: str, home: str | None) -> tuple[bool | None, s
     return ok, val[:12] if ok else val
 
 
-def _check_merged(repo: str, sha: str, home: str | None) -> tuple[bool | None, str]:
+def _check_merged(repo: str, sha: str, home: str | None, branch: str | None = None) -> tuple[bool | None, str]:
     local = _local(repo)
     if local:
         ok, branches, why = _remote_branches(local, sha)
         if not ok:
             return ok, why
+        if branch:
+            return (True, branch) if f"origin/{branch}" in branches else (False, f"{branch} does not contain {sha}")
         main = [b for b in branches if re.fullmatch(r"origin/(main|master)|origin/HEAD.*", b)]
         return (True, main[0]) if main else (False, f"origin main does not contain {sha}")
-    ok, branch = _gh(f"repos/{repo}", ".default_branch", home)
-    if not ok:
-        return ok, branch
+    if not branch:
+        ok, branch = _gh(f"repos/{repo}", ".default_branch", home)
+        if not ok:
+            return ok, branch
     ok, status = _gh(f"repos/{repo}/compare/{sha}...{branch}", ".status", home)
     if not ok:
         return ok, status
@@ -288,7 +293,8 @@ def extract(text: str) -> list[tuple]:
         if short:  # same check as the URL form
             line = line.replace(short.group(0), f"https://github.com/{short.group(1)}/pull/{short.group(2)}")
         pr = _PR.search(line)
-        merged = live(_MERGED) if _MERGE_CTX.search(line) else None
+        target = live(_MERGED_INTO)
+        merged = live(_MERGED) if target or _MERGE_CTX.search(line) else None
         side = bool(merged) and bool(_SIDE_BRANCH.match(line, merged.end()))
         if pr:
             sha = None if side else _HEAD_AFTER.match(line, pr.end())
@@ -296,6 +302,8 @@ def extract(text: str) -> list[tuple]:
                 bool(merged) and not side)
         elif merged and not side:
             add("merged", repo.group(0) if repo else "", *(repo.groups() if repo else ()))
+        elif merged and target and repo:  # side branch named next to a repo@sha: check that branch
+            add("merged", repo.group(0), *repo.groups(), target.group(1).rstrip("."))
         elif live(_PRWORD):
             pr = _one(_PR, line, text)
             add("pr", pr.group(0) if pr else "", *((pr.group(1), pr.group(2), "", False) if pr else ()))
@@ -356,8 +364,8 @@ def _verify(kind: str, args: tuple, home: str | None) -> tuple[bool | None, str]
         return os.path.exists(args[0]), "exists" if os.path.exists(args[0]) else f"{args[0]} does not exist"
     if kind == "pushed":
         return _check_pushed(args[0], args[1], home)
-    if kind == "merged" and len(args) == 2:
-        return _check_merged(args[0], args[1], home)
+    if kind == "merged" and len(args) in (2, 3):
+        return _check_merged(args[0], args[1], home, *args[2:])
     if kind in ("pr", "merged"):
         return _check_pr(*args, home)
     if kind == "tests":

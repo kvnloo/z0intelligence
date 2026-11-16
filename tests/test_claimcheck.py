@@ -118,6 +118,25 @@ def test_09_pr_state_and_head(fake):
     assert one("PR opened for the fix", "pr")["ok"] is None
 
 
+@pytest.mark.parametrize("status, expected", [
+    ("ahead", True), ("identical", True), ("behind", False), ("diverged", False),
+])
+def test_merged_into_named_branch(fake, status, expected):
+    calls, answers = fake
+    answers["compare/8b96606...feature/fix"] = (0, status.encode(), "")
+    c = one("kvnloo/x@8b96606 merged into `feature/fix`", "merged")
+    assert c["ok"] is expected
+    assert "feature/fix" in c["detail"]
+    # F24 also checks every owner/repo@sha as pushed; the merge itself is judged against the named branch
+    assert "gh api repos/kvnloo/x/compare/8b96606...feature/fix --hostname github.com --jq .status" in calls
+
+
+def test_merged_into_named_branch_without_sha_is_not_a_claim(fake):
+    # F24: a side-branch merge with nothing to check stays a non-claim, so it never newly blocks a message
+    assert C.check("merged into feature/fix") == []
+    assert fake[0] == []
+
+
 def test_10_11_12_13_tests_need_a_fresh_result_file_and_a_count(tmp_path):
     ok, err = tmp_path / "junit.xml", tmp_path / "collect140-junit.xml"
     ok.write_text(JUNIT_OK)
