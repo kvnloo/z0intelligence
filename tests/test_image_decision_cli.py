@@ -286,3 +286,17 @@ def test_main_returns_func_result(
     assert cli.main() == 0
     assert json.loads(capsys.readouterr().out)["choice"] == "a"
     assert len(fake.calls) == 1
+
+
+def test_run_one_preserves_zero_option_id(tmp_path: Path) -> None:
+    fake = FakeBackend()
+    raw = _sample_request()
+    raw["options"] = [{"id": 0, "description": "Zero"}]
+
+    result = cli._run_one(fake, raw, tmp_path / "req.json")
+
+    assert fake.calls[0]["options"] == (ImageDecisionOption(id="0", description="Zero"),)
+    assert result["choice"] == "0"
+    assert result["probabilities"] == {"0": 1.0}
+    with pytest.raises(ValueError, match="option id must be nonempty"):
+        cli._parse_options([{"id": None, "description": "Zero"}])
