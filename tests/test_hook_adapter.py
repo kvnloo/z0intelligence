@@ -124,6 +124,7 @@ def run_turn(h, tmp_path, harness=None, **kw):
 
 
 # ----------------------------------------------------------------------------- hot path
+@pytest.mark.perf
 def test_prompt_handler_returns_under_5ms_p99_with_the_build_detached(home, monkeypatch, tmp_path):
     spawned = []
     monkeypatch.setattr(hc, 'spawn_detached', lambda argv, job: spawned.append(argv))
@@ -150,6 +151,7 @@ def test_importing_the_hook_entry_loads_only_stdlib_and_the_capture_core():
     assert not foreign, foreign
 
 
+@pytest.mark.perf
 def test_hook_subprocess_wall_time_is_within_bare_python_plus_40ms(tmp_path):
     """p95 hook wall time <= p95 bare-python wall time + 40 ms, both measured in this run, interleaved.
 
