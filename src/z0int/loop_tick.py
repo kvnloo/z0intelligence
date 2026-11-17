@@ -5,9 +5,9 @@
 The tick takes flock(2) LOCK_SH on the quiet-lane lock in-process (the same kernel lock ``flock -s`` takes; a POSIX
 fcntl/lockf record lock would not interact with a quiet-timed ``flock -x``). When an exclusive window holds the lock
 past ``--lock-wait-s`` it writes a ``skipped_exclusive_window`` report and exits 0. The hold is bounded by
-``--budget-s`` plus at most one unit of work already in flight: verify stops between harnesses, import between
+``--budget-s`` plus at most one unit of work already in flight: verify stops between sessions, import between
 legacy sources, the shadow slot between opportunities and the learner subprocess is killed at the deadline, but one
-harness's verify, one source's import or the single export call is never cut in half. An exhausted budget releases
+session's verify, one source's import or the single export call is never cut in half. An exhausted budget releases
 the lock and reports ``partial_measurement``; the next tick resumes (every step is idempotent).
 
 Steps (each reuses its module; nothing here re-derives a label or a threshold the learner owns):
@@ -369,7 +369,10 @@ def _verify(home: Path, out: Path, cfg: Mapping, st: dict, *, deadline: float, a
                 return
             st['verify'][h] = ov.verify_harness(h, root=home, agentsview=agentsview,
                                                 projects=Path(projects) if projects else None, gh=ov.GitHub(False),
-                                                write=True)
+                                                write=True, deadline=deadline)
+            if st['verify'][h].get('partial'):
+                st['verify_partial'] = True
+                return
 
 
 def _import(home: Path, out: Path, cfg: Mapping, st: dict, *, deadline: float, **_: Any) -> None:

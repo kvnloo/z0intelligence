@@ -146,6 +146,37 @@ def tick(world, **kw):
     return tick_mod().run_tick(world.home, **kw)
 
 
+def test_verify_stops_between_sessions_at_tick_budget(world, monkeypatch):
+    from test_outcome_verifier import T0, Transcript, observed
+    from z0int import outcome_verifier as ov
+    projects = world.root / 'projects'
+    hc.state_dir('claude-code', world.home).mkdir(parents=True, exist_ok=True)
+    for sid in ('a', 'b'):
+        transcript = Transcript(session=sid)
+        transcript.prompt('p1', 'test', T0)
+        transcript.write(projects)
+        observed(world.home, sid, 'p1')
+    clock = [0.0]
+    visited = []
+    real_session_turns = ov.session_turns
+
+    def session_turns(path):
+        visited.append(path.stem)
+        result = real_session_turns(path)
+        clock[0] += 5.0
+        return result
+
+    monkeypatch.setattr(time, 'monotonic', lambda: clock[0])
+    monkeypatch.setattr(ov, 'session_turns', session_turns)
+    rep = tick(world, budget_s=5.0, projects=projects)
+    assert visited == ['a'] and clock[0] == 5.0
+    verify_step = next(s for s in rep['steps'] if s['name'] == 'verify')
+    assert verify_step['status'] == 'partial'
+    assert all(s['status'] == 'skipped_budget' for s in rep['steps'][2:])
+    assert rep['rows_added']['verified'] == 1
+    assert lock_is_free(world.lock)
+
+
 def snapshot(root, skip=()):
     out = {}
     for p in sorted(root.rglob('*')):
