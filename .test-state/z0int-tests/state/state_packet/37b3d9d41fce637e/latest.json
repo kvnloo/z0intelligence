@@ -1,0 +1,522 @@
+{
+ "schema": "z0int.state_packet.v0",
+ "packet_id": "62b6783424674c17d711",
+ "built_at": "2026-11-09T13:47:57Z",
+ "intent": {
+  "name": "resume",
+  "required": [
+   "git.head",
+   "git.branch",
+   "git.dirty",
+   "conv.latest_session"
+  ]
+ },
+ "scope": {
+  "repo": "/workspace/hermes-home/profiles/ayo/cache/scratch/pytest-of-kvn/pytest-5/test_opportunity_record_for_re0/repo",
+  "repo_name": "repo"
+ },
+ "decision": {
+  "mode": "OBSERVE",
+  "missing": [
+   "conv.latest_session"
+  ],
+  "reason": "required fact(s) missing/contested: conv.latest_session"
+ },
+ "current_claims": [
+  {
+   "id": "c:ad67601a79",
+   "key": "git.branch",
+   "value": "main",
+   "status": "observed",
+   "evidence": [
+    "e:a796324630"
+   ],
+   "observed_at": "2026-11-09T13:47:57Z",
+   "material": true
+  },
+  {
+   "id": "c:98ebae5549",
+   "key": "git.head",
+   "value": {
+    "sha": "1c50144",
+    "date": "2026-11-09T07:47:57-06:00",
+    "subject": "init"
+   },
+   "status": "observed",
+   "evidence": [
+    "e:cd37aa3c8a"
+   ],
+   "observed_at": "2026-11-09T13:47:57Z",
+   "material": true
+  },
+  {
+   "id": "c:98775c330e",
+   "key": "git.recent_commits",
+   "value": [
+    {
+     "sha": "1c50144",
+     "date": "2026-11-09T07:47:57-06:00",
+     "subject": "init"
+    }
+   ],
+   "status": "observed",
+   "evidence": [
+    "e:222d2a2ce7"
+   ],
+   "observed_at": "2026-11-09T13:47:57Z",
+   "material": false
+  },
+  {
+   "id": "c:41f4d135db",
+   "key": "git.default_branch",
+   "value": "main",
+   "status": "observed",
+   "evidence": [
+    "e:791942d968"
+   ],
+   "observed_at": "2026-11-09T13:47:57Z",
+   "material": true
+  },
+  {
+   "id": "c:fbcf5b7e9e",
+   "key": "git.dirty",
+   "value": {
+    "clean": true,
+    "modified": [],
+    "untracked": [],
+    "modified_count": 0,
+    "untracked_count": 0
+   },
+   "status": "observed",
+   "evidence": [
+    "e:45dbc5c01e"
+   ],
+   "observed_at": "2026-11-09T13:47:57Z",
+   "material": true
+  },
+  {
+   "id": "c:f210fd59b7",
+   "key": "git.branches_ahead",
+   "value": {
+    "vs": "main",
+    "complete": true,
+    "local_branches": 1,
+    "ahead": []
+   },
+   "status": "observed",
+   "evidence": [
+    "e:1bb7c85b96"
+   ],
+   "observed_at": "2026-11-09T13:47:57Z",
+   "material": true
+  },
+  {
+   "id": "c:fc1e9510eb",
+   "key": "resource.posture",
+   "value": {
+    "factory": "BALANCED",
+    "action": "frontier on pace",
+    "prefer": [
+     "claude",
+     "codex",
+     "cursor",
+     "grok"
+    ],
+    "avoid": [],
+    "offload_targets": [
+     "route:groq",
+     "route:openrouter"
+    ],
+    "earliest_reset": null,
+    "groups": {
+     "claude": "BALANCED",
+     "codex": "BALANCED",
+     "cursor": "BALANCED",
+     "grok": "BALANCED",
+     "openrouter": "BALANCED"
+    },
+    "enforce": false,
+    "line": "BALANCED (claude=BALANCED, codex=BALANCED, cursor=BALANCED, grok=BALANCED, openrouter=BALANCED) — frontier on pace"
+   },
+   "status": "observed",
+   "evidence": [
+    "e:7f63af2493"
+   ],
+   "observed_at": "2026-11-09T13:47:57Z",
+   "material": false
+  },
+  {
+   "id": "c:ca912bb139",
+   "key": "resource.posture[claude]",
+   "value": {
+    "posture": "BALANCED",
+    "binding_pool": "claude:weekly",
+    "arithmetic": "observation predates reset at 2026-10-22T08:00:00Z; current remaining unknown",
+    "resets_at": "2026-10-22T08:00:00Z"
+   },
+   "status": "observed",
+   "evidence": [
+    "e:7f63af2493"
+   ],
+   "observed_at": "2026-11-09T13:47:57Z",
+   "material": false
+  },
+  {
+   "id": "c:e0040c1944",
+   "key": "resource.posture[codex]",
+   "value": {
+    "posture": "BALANCED",
+    "binding_pool": "codex:weekly",
+    "arithmetic": "observation predates reset at 2026-11-05T02:36:47Z; current remaining unknown",
+    "resets_at": "2026-11-05T02:36:47Z"
+   },
+   "status": "observed",
+   "evidence": [
+    "e:7f63af2493"
+   ],
+   "observed_at": "2026-11-09T13:47:57Z",
+   "material": false
+  },
+  {
+   "id": "c:e2c41d0a27",
+   "key": "resource.posture[cursor]",
+   "value": {
+    "posture": "BALANCED",
+    "binding_pool": "cursor:30d",
+    "arithmetic": "observation predates reset at 2026-10-09T15:49:40Z; current remaining unknown",
+    "resets_at": "2026-10-09T15:49:40Z"
+   },
+   "status": "observed",
+   "evidence": [
+    "e:7f63af2493"
+   ],
+   "observed_at": "2026-11-09T13:47:57Z",
+   "material": false
+  },
+  {
+   "id": "c:41c49d9e22",
+   "key": "resource.posture[grok]",
+   "value": {
+    "posture": "BALANCED",
+    "binding_pool": "grok:primary",
+    "arithmetic": "observation predates reset at 2026-10-03T02:57:16Z; current remaining unknown",
+    "resets_at": "2026-10-03T02:57:16Z"
+   },
+   "status": "observed",
+   "evidence": [
+    "e:7f63af2493"
+   ],
+   "observed_at": "2026-11-09T13:47:57Z",
+   "material": false
+  },
+  {
+   "id": "c:2bc67edbdf",
+   "key": "resource.posture[openrouter]",
+   "value": {
+    "posture": "BALANCED",
+    "binding_pool": "openrouter:credits",
+    "arithmetic": "remaining 49.3%; no burn-rate observation",
+    "resets_at": null
+   },
+   "status": "observed",
+   "evidence": [
+    "e:7f63af2493"
+   ],
+   "observed_at": "2026-11-09T13:47:57Z",
+   "material": false
+  }
+ ],
+ "evidence": {
+  "e:a796324630": {
+   "source_id": "git:repo",
+   "source_version": "1c5014465ca6",
+   "locator": "/workspace/hermes-home/profiles/ayo/cache/scratch/pytest-of-kvn/pytest-5/test_opportunity_record_for_re0/repo:git branch --show-current",
+   "trust_class": "code",
+   "observed_at": "2026-11-09T13:47:57Z"
+  },
+  "e:cd37aa3c8a": {
+   "source_id": "git:repo",
+   "source_version": "1c5014465ca6",
+   "locator": "/workspace/hermes-home/profiles/ayo/cache/scratch/pytest-of-kvn/pytest-5/test_opportunity_record_for_re0/repo:git log -1 1c50144",
+   "trust_class": "code",
+   "observed_at": "2026-11-09T13:47:57Z"
+  },
+  "e:222d2a2ce7": {
+   "source_id": "git:repo",
+   "source_version": "1c5014465ca6",
+   "locator": "/workspace/hermes-home/profiles/ayo/cache/scratch/pytest-of-kvn/pytest-5/test_opportunity_record_for_re0/repo:git log -n 8",
+   "trust_class": "code",
+   "observed_at": "2026-11-09T13:47:57Z"
+  },
+  "e:791942d968": {
+   "source_id": "git:repo",
+   "source_version": "1c5014465ca6",
+   "locator": "/workspace/hermes-home/profiles/ayo/cache/scratch/pytest-of-kvn/pytest-5/test_opportunity_record_for_re0/repo:refs/remotes/origin/HEAD",
+   "trust_class": "code",
+   "observed_at": "2026-11-09T13:47:57Z"
+  },
+  "e:45dbc5c01e": {
+   "source_id": "git:repo",
+   "source_version": "1c5014465ca6+ste3b0c44298fc",
+   "locator": "/workspace/hermes-home/profiles/ayo/cache/scratch/pytest-of-kvn/pytest-5/test_opportunity_record_for_re0/repo:git status --porcelain",
+   "trust_class": "code",
+   "observed_at": "2026-11-09T13:47:57Z"
+  },
+  "e:1bb7c85b96": {
+   "source_id": "git:repo",
+   "source_version": "1c5014465ca6",
+   "locator": "/workspace/hermes-home/profiles/ayo/cache/scratch/pytest-of-kvn/pytest-5/test_opportunity_record_for_re0/repo:git for-each-ref refs/heads",
+   "trust_class": "code",
+   "observed_at": "2026-11-09T13:47:57Z"
+  },
+  "e:7f63af2493": {
+   "source_id": "posture:codexbar+worker_routing",
+   "source_version": "0b899a2878f3",
+   "locator": "/home/kvn/.cache/codexbar-waybar/last.json",
+   "trust_class": "derived_memory",
+   "observed_at": "2026-11-09T13:47:57Z",
+   "note": "derived from usage snapshots up to 1159.1h old; re-run `z0int posture`"
+  }
+ },
+ "contradictions": [],
+ "blocking_unknowns": [
+  {
+   "key": "conv.latest_session",
+   "reason": "none recorded: 9 local Claude Code transcript(s) checked and none touched repo; the index is complete, so answer 'no recorded session' rather than guessing",
+   "required_by": "resume",
+   "source_status": "no_match"
+  }
+ ],
+ "unknowns": [
+  {
+   "key": "docs.any",
+   "reason": "no top-level AGENTS/README/ROADMAP docs"
+  }
+ ],
+ "open_work": [],
+ "superseded_claims": [],
+ "allowed_transitions": [
+  {
+   "kind": "OBSERVE",
+   "action": "refresh_packet",
+   "why": "always legal; re-reads changed sources only",
+   "authorizes": false
+  },
+  {
+   "kind": "OBSERVE",
+   "action": "resolve_unknown:conv.latest_session",
+   "why": "none recorded: 9 local Claude Code transcript(s) checked and none touched repo; the index is complete, so answer 'no recorded session' rather than guessing",
+   "authorizes": false
+  }
+ ],
+ "source_revisions": {
+  "git": {
+   "head": "1c5014465ca6a27923af63581d3eda5cc8d38da1",
+   "status": "e3b0c44298fc",
+   "refs": "22f75298bdde"
+  },
+  "docs": {},
+  "claude_code": {},
+  "resource": {
+   "posture": "0b899a2878f3",
+   "factory": "BALANCED"
+  }
+ },
+ "policy_revision": "sp-v0.2",
+ "coverage": {
+  "git": "full",
+  "docs": "none",
+  "claude_code": "none",
+  "resource": "partial"
+ },
+ "freshness": {},
+ "claims_index": {
+  "git.branch": {
+   "id": "c:ad67601a79",
+   "value": "main",
+   "observed_at": "2026-11-09T13:47:57Z",
+   "material": true
+  },
+  "git.head": {
+   "id": "c:98ebae5549",
+   "value": {
+    "sha": "1c50144",
+    "date": "2026-11-09T07:47:57-06:00",
+    "subject": "init"
+   },
+   "observed_at": "2026-11-09T13:47:57Z",
+   "material": true
+  },
+  "git.recent_commits": {
+   "id": "c:98775c330e",
+   "value": [
+    {
+     "sha": "1c50144",
+     "date": "2026-11-09T07:47:57-06:00",
+     "subject": "init"
+    }
+   ],
+   "observed_at": "2026-11-09T13:47:57Z",
+   "material": false
+  },
+  "git.default_branch": {
+   "id": "c:41f4d135db",
+   "value": "main",
+   "observed_at": "2026-11-09T13:47:57Z",
+   "material": true
+  },
+  "git.dirty": {
+   "id": "c:fbcf5b7e9e",
+   "value": {
+    "clean": true,
+    "modified": [],
+    "untracked": [],
+    "modified_count": 0,
+    "untracked_count": 0
+   },
+   "observed_at": "2026-11-09T13:47:57Z",
+   "material": true
+  },
+  "git.branches_ahead": {
+   "id": "c:f210fd59b7",
+   "value": {
+    "vs": "main",
+    "complete": true,
+    "local_branches": 1,
+    "ahead": []
+   },
+   "observed_at": "2026-11-09T13:47:57Z",
+   "material": true
+  },
+  "resource.posture": {
+   "id": "c:fc1e9510eb",
+   "value": {
+    "factory": "BALANCED",
+    "action": "frontier on pace",
+    "prefer": [
+     "claude",
+     "codex",
+     "cursor",
+     "grok"
+    ],
+    "avoid": [],
+    "offload_targets": [
+     "route:groq",
+     "route:openrouter"
+    ],
+    "earliest_reset": null,
+    "groups": {
+     "claude": "BALANCED",
+     "codex": "BALANCED",
+     "cursor": "BALANCED",
+     "grok": "BALANCED",
+     "openrouter": "BALANCED"
+    },
+    "enforce": false,
+    "line": "BALANCED (claude=BALANCED, codex=BALANCED, cursor=BALANCED, grok=BALANCED, openrouter=BALANCED) — frontier on pace"
+   },
+   "observed_at": "2026-11-09T13:47:57Z",
+   "material": false
+  },
+  "resource.posture[claude]": {
+   "id": "c:ca912bb139",
+   "value": {
+    "posture": "BALANCED",
+    "binding_pool": "claude:weekly",
+    "arithmetic": "observation predates reset at 2026-10-22T08:00:00Z; current remaining unknown",
+    "resets_at": "2026-10-22T08:00:00Z"
+   },
+   "observed_at": "2026-11-09T13:47:57Z",
+   "material": false
+  },
+  "resource.posture[codex]": {
+   "id": "c:e0040c1944",
+   "value": {
+    "posture": "BALANCED",
+    "binding_pool": "codex:weekly",
+    "arithmetic": "observation predates reset at 2026-11-05T02:36:47Z; current remaining unknown",
+    "resets_at": "2026-11-05T02:36:47Z"
+   },
+   "observed_at": "2026-11-09T13:47:57Z",
+   "material": false
+  },
+  "resource.posture[cursor]": {
+   "id": "c:e2c41d0a27",
+   "value": {
+    "posture": "BALANCED",
+    "binding_pool": "cursor:30d",
+    "arithmetic": "observation predates reset at 2026-10-09T15:49:40Z; current remaining unknown",
+    "resets_at": "2026-10-09T15:49:40Z"
+   },
+   "observed_at": "2026-11-09T13:47:57Z",
+   "material": false
+  },
+  "resource.posture[grok]": {
+   "id": "c:41c49d9e22",
+   "value": {
+    "posture": "BALANCED",
+    "binding_pool": "grok:primary",
+    "arithmetic": "observation predates reset at 2026-10-03T02:57:16Z; current remaining unknown",
+    "resets_at": "2026-10-03T02:57:16Z"
+   },
+   "observed_at": "2026-11-09T13:47:57Z",
+   "material": false
+  },
+  "resource.posture[openrouter]": {
+   "id": "c:2bc67edbdf",
+   "value": {
+    "posture": "BALANCED",
+    "binding_pool": "openrouter:credits",
+    "arithmetic": "remaining 49.3%; no burn-rate observation",
+    "resets_at": null
+   },
+   "observed_at": "2026-11-09T13:47:57Z",
+   "material": false
+  }
+ },
+ "cache": {
+  "key": "62b6783424674c17d711",
+  "prior_packet_id": null
+ },
+ "privacy": {
+  "local_only": true,
+  "excerpt_max_chars": 160,
+  "note": "conversation content limited to redacted short excerpts/titles"
+ },
+ "measurements": {
+  "cache_hit": false,
+  "wall_ms": 81.3,
+  "adapters": {
+   "git": {
+    "wall_ms": 15.19,
+    "reads": 12,
+    "bytes_read": 345,
+    "claims": 6
+   },
+   "docs": {
+    "wall_ms": 0.17,
+    "reads": 0,
+    "bytes_read": 0,
+    "claims": 0
+   },
+   "claude_code": {
+    "wall_ms": 7.58,
+    "reads": 0,
+    "bytes_read": 0,
+    "claims": 0
+   },
+   "resource": {
+    "wall_ms": 1.3,
+    "reads": 0,
+    "bytes_read": 0,
+    "claims": 6
+   }
+  },
+  "raw_source_reads": 24,
+  "bytes_read": 6555502,
+  "transcript_bytes_read": 6555059,
+  "packet_bytes": 10795,
+  "concurrent_adapters": 4,
+  "network_calls": 0
+ }
+}
