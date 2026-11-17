@@ -213,6 +213,19 @@ class _ChatFromResponses:
             if i in self.calls:
                 self.calls[i]["function"]["arguments"] += ev.get("delta") or ""
             out.append(self.chunk({"tool_calls": [{"index": i, "function": {"arguments": ev.get("delta") or ""}}]}))
+        elif t in ("response.function_call_arguments.done", "response.output_item.done"):
+            # Parallel calls can arrive with no argument deltas, only the full arguments on .done;
+            # emit whatever the deltas did not already deliver.
+            it = ev.get("item") or {}
+            if t == "response.output_item.done" and it.get("type") != "function_call":
+                return out
+            i = self.tool_index.get(ev.get("item_id") or it.get("id") or it.get("call_id"))
+            full = ev.get("arguments") if t == "response.function_call_arguments.done" else it.get("arguments")
+            if i in self.calls and isinstance(full, str):
+                sent = self.calls[i]["function"]["arguments"]
+                if full != sent and full.startswith(sent):
+                    self.calls[i]["function"]["arguments"] = full
+                    out.append(self.chunk({"tool_calls": [{"index": i, "function": {"arguments": full[len(sent):]}}]}))
         elif t in ("response.completed", "response.incomplete"):
             u = (ev.get("response") or {}).get("usage") or {}
             self.usage = {"prompt_tokens": u.get("input_tokens", 0), "completion_tokens": u.get("output_tokens", 0),
