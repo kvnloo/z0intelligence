@@ -1,0 +1,2 @@
+{"schema": "z0int.claude_code.failure.v0", "kind": "unsupported_schema", "harness": "claude-code", "recorded_at": "2026-11-07T22:53:59Z", "detail": {"record": "hook_payload", "schema_version": null}}
+{"schema": "z0int.claude_code.failure.v0", "kind": "unsupported_schema", "harness": "claude-code", "recorded_at": "2026-11-08T12:26:27Z", "detail": {"record": "hook_payload", "schema_version": null}}

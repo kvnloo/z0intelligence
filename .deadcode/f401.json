@@ -1,0 +1,906 @@
+[
+ {
+  "file": "adapters/hermes_z0int/adapter.py",
+  "line": "12",
+  "col": "30",
+  "mod": "z0int.harness_id.HarnessIdentity",
+  "sym": "HarnessIdentity",
+  "reexport_importers": []
+ },
+ {
+  "file": "benchmarks/julia_claims/calibration.py",
+  "line": "24",
+  "col": "13",
+  "mod": "representation_ablation.evaluate",
+  "sym": "evaluate",
+  "reexport_importers": []
+ },
+ {
+  "file": "benchmarks/julia_claims/parity.py",
+  "line": "29",
+  "col": "8",
+  "mod": "sys",
+  "sym": "sys",
+  "reexport_importers": []
+ },
+ {
+  "file": "benchmarks/julia_claims/published_claims.py",
+  "line": "20",
+  "col": "8",
+  "mod": "collections",
+  "sym": "collections",
+  "reexport_importers": []
+ },
+ {
+  "file": "benchmarks/state_packet/pin_fixtures.py",
+  "line": "28",
+  "col": "8",
+  "mod": "shutil",
+  "sym": "shutil",
+  "reexport_importers": []
+ },
+ {
+  "file": "examples/jevlike/chess/eval.py",
+  "line": "29",
+  "col": "43",
+  "mod": "openjev_phase1.jevlike.vision.CHESS_OPTION_IDS",
+  "sym": "CHESS_OPTION_IDS",
+  "reexport_importers": []
+ },
+ {
+  "file": "examples/jevlike/chess/train.py",
+  "line": "15",
+  "col": "17",
+  "mod": "numpy",
+  "sym": "numpy",
+  "reexport_importers": []
+ },
+ {
+  "file": "examples/jevlike/doom/audit.py",
+  "line": "15",
+  "col": "25",
+  "mod": "environment.DEFEND_ACTIONS",
+  "sym": "DEFEND_ACTIONS",
+  "reexport_importers": []
+ },
+ {
+  "file": "examples/jevlike/doom/environment.py",
+  "line": "7",
+  "col": "17",
+  "mod": "numpy",
+  "sym": "numpy",
+  "reexport_importers": []
+ },
+ {
+  "file": "examples/jevlike/doom/train_joint.py",
+  "line": "17",
+  "col": "60",
+  "mod": "openjev_phase1.jevlike.vision.TOTAL_OPTIONS",
+  "sym": "TOTAL_OPTIONS",
+  "reexport_importers": []
+ },
+ {
+  "file": "examples/refinement/demo.py",
+  "line": "6",
+  "col": "25",
+  "mod": "dataclasses.replace",
+  "sym": "replace",
+  "reexport_importers": []
+ },
+ {
+  "file": "scripts/probe_local_cognition.py",
+  "line": "147",
+  "col": "54",
+  "mod": "z0int.cognition.registry.ServingEndpoint",
+  "sym": "ServingEndpoint",
+  "reexport_importers": []
+ },
+ {
+  "file": "src/openjev_phase1/reranker.py",
+  "line": "101",
+  "col": "12",
+  "mod": "torch",
+  "sym": "torch",
+  "reexport_importers": []
+ },
+ {
+  "file": "src/z0int/abab.py",
+  "line": "26",
+  "col": "44",
+  "mod": "dataclasses.field",
+  "sym": "field",
+  "reexport_importers": []
+ },
+ {
+  "file": "src/z0int/autoresearch/replay.py",
+  "line": "180",
+  "col": "12",
+  "mod": "json",
+  "sym": "json",
+  "reexport_importers": []
+ },
+ {
+  "file": "src/z0int/backends/bench/analytics.py",
+  "line": "11",
+  "col": "56",
+  "mod": "tokenomics.coverage.format_coverage_text",
+  "sym": "format_coverage_text",
+  "reexport_importers": []
+ },
+ {
+  "file": "src/z0int/backends/bench/roster.py",
+  "line": "8",
+  "col": "48",
+  "mod": "z0int.models_mgmt.load_manifest",
+  "sym": "load_manifest",
+  "reexport_importers": []
+ },
+ {
+  "file": "src/z0int/backends/bench/roster.py",
+  "line": "11",
+  "col": "65",
+  "mod": ".contract.is_roster_candidate",
+  "sym": "is_roster_candidate",
+  "reexport_importers": []
+ },
+ {
+  "file": "src/z0int/backends/bench/run_manifest.py",
+  "line": "9",
+  "col": "32",
+  "mod": "datetime.timezone",
+  "sym": "timezone",
+  "reexport_importers": []
+ },
+ {
+  "file": "src/z0int/backends/bench/tokenomics_bridge.py",
+  "line": "8",
+  "col": "36",
+  "mod": "dataclasses.field",
+  "sym": "field",
+  "reexport_importers": []
+ },
+ {
+  "file": "src/z0int/backends/decider.py",
+  "line": "5",
+  "col": "8",
+  "mod": "math",
+  "sym": "math",
+  "reexport_importers": []
+ },
+ {
+  "file": "src/z0int/backends/julia.py",
+  "line": "31",
+  "col": "8",
+  "mod": "sys",
+  "sym": "sys",
+  "reexport_importers": []
+ },
+ {
+  "file": "src/z0int/backends/nanojev_runtime.py",
+  "line": "18",
+  "col": "8",
+  "mod": "math",
+  "sym": "math",
+  "reexport_importers": []
+ },
+ {
+  "file": "src/z0int/backends/openjev_direct.py",
+  "line": "5",
+  "col": "8",
+  "mod": "json",
+  "sym": "json",
+  "reexport_importers": []
+ },
+ {
+  "file": "src/z0int/backends/openjev_direct.py",
+  "line": "6",
+  "col": "8",
+  "mod": "os",
+  "sym": "os",
+  "reexport_importers": []
+ },
+ {
+  "file": "src/z0int/bridge/worker.py",
+  "line": "15",
+  "col": "8",
+  "mod": "time",
+  "sym": "time",
+  "reexport_importers": []
+ },
+ {
+  "file": "src/z0int/bridge/worker.py",
+  "line": "19",
+  "col": "37",
+  "mod": "z0int.bridge.generation.publish_current",
+  "sym": "publish_current",
+  "reexport_importers": []
+ },
+ {
+  "file": "src/z0int/bridge/worker.py",
+  "line": "20",
+  "col": "35",
+  "mod": "z0int.bridge.protocol.BRIDGE_PROTOCOL",
+  "sym": "BRIDGE_PROTOCOL",
+  "reexport_importers": []
+ },
+ {
+  "file": "src/z0int/cascade.py",
+  "line": "21",
+  "col": "8",
+  "mod": "math",
+  "sym": "math",
+  "reexport_importers": []
+ },
+ {
+  "file": "src/z0int/cascade.py",
+  "line": "24",
+  "col": "25",
+  "mod": "typing.Iterable",
+  "sym": "Iterable",
+  "reexport_importers": []
+ },
+ {
+  "file": "src/z0int/cli.py",
+  "line": "872",
+  "col": "9",
+  "mod": "z0int.task_loop.save_checkpoint",
+  "sym": "save_checkpoint",
+  "reexport_importers": []
+ },
+ {
+  "file": "src/z0int/cognition/adapters/bounded.py",
+  "line": "16",
+  "col": "25",
+  "mod": "typing.Mapping",
+  "sym": "Mapping",
+  "reexport_importers": []
+ },
+ {
+  "file": "src/z0int/cognition/adapters/bounded.py",
+  "line": "28",
+  "col": "23",
+  "mod": "..actions.LegalActionSet",
+  "sym": "LegalActionSet",
+  "reexport_importers": []
+ },
+ {
+  "file": "src/z0int/cognition/candidates.py",
+  "line": "37",
+  "col": "22",
+  "mod": ".actions.RISK_CLASSES",
+  "sym": "RISK_CLASSES",
+  "reexport_importers": []
+ },
+ {
+  "file": "src/z0int/cognition/cascade.py",
+  "line": "28",
+  "col": "5",
+  "mod": ".escalation.entropy_of",
+  "sym": "entropy_of",
+  "reexport_importers": []
+ },
+ {
+  "file": "src/z0int/cognition/cascade.py",
+  "line": "29",
+  "col": "5",
+  "mod": ".escalation.margin_of",
+  "sym": "margin_of",
+  "reexport_importers": []
+ },
+ {
+  "file": "src/z0int/cognition/server.py",
+  "line": "28",
+  "col": "36",
+  "mod": "dataclasses.field",
+  "sym": "field",
+  "reexport_importers": []
+ },
+ {
+  "file": "src/z0int/cognition/surface.py",
+  "line": "33",
+  "col": "25",
+  "mod": "typing.Iterable",
+  "sym": "Iterable",
+  "reexport_importers": []
+ },
+ {
+  "file": "src/z0int/cognition/surface.py",
+  "line": "36",
+  "col": "5",
+  "mod": ".candidates.QUALITY_CLASSES",
+  "sym": "QUALITY_CLASSES",
+  "reexport_importers": []
+ },
+ {
+  "file": "src/z0int/compile.py",
+  "line": "15",
+  "col": "23",
+  "mod": ".families.FAMILIES",
+  "sym": "FAMILIES",
+  "reexport_importers": []
+ },
+ {
+  "file": "src/z0int/dispatch_authority.py",
+  "line": "12",
+  "col": "38",
+  "mod": ".receipt.find_receipt",
+  "sym": "find_receipt",
+  "reexport_importers": []
+ },
+ {
+  "file": "src/z0int/dispatch_authority.py",
+  "line": "12",
+  "col": "67",
+  "mod": ".receipt.DecisionReceipt",
+  "sym": "DecisionReceipt",
+  "reexport_importers": []
+ },
+ {
+  "file": "src/z0int/dispatch_authority.py",
+  "line": "188",
+  "col": "72",
+  "mod": ".worker_routing.free_required",
+  "sym": "free_required",
+  "reexport_importers": []
+ },
+ {
+  "file": "src/z0int/functions/laya.py",
+  "line": "22",
+  "col": "8",
+  "mod": "time",
+  "sym": "time",
+  "reexport_importers": []
+ },
+ {
+  "file": "src/z0int/functions/verify_evidence_sufficiency.py",
+  "line": "23",
+  "col": "5",
+  "mod": ".contract.ACTIONS",
+  "sym": "ACTIONS",
+  "reexport_importers": []
+ },
+ {
+  "file": "src/z0int/intelligence.py",
+  "line": "6",
+  "col": "8",
+  "mod": "os",
+  "sym": "os",
+  "reexport_importers": []
+ },
+ {
+  "file": "src/z0int/intelligence.py",
+  "line": "10",
+  "col": "15",
+  "mod": ".paths",
+  "sym": "paths",
+  "reexport_importers": []
+ },
+ {
+  "file": "src/z0int/intelligence_mcp.py",
+  "line": "7",
+  "col": "21",
+  "mod": "pathlib.Path",
+  "sym": "Path",
+  "reexport_importers": []
+ },
+ {
+  "file": "src/z0int/memory_mcp.py",
+  "line": "24",
+  "col": "36",
+  "mod": ".memory_mcp_backends.BackendUnavailable",
+  "sym": "BackendUnavailable",
+  "reexport_importers": []
+ },
+ {
+  "file": "src/z0int/outcome_randomized_evidence.py",
+  "line": "17",
+  "col": "5",
+  "mod": ".outcome_coverage.WINDOW_ORDER",
+  "sym": "WINDOW_ORDER",
+  "reexport_importers": []
+ },
+ {
+  "file": "src/z0int/outcome_randomized_evidence.py",
+  "line": "18",
+  "col": "5",
+  "mod": ".outcome_coverage._expectation_key",
+  "sym": "_expectation_key",
+  "reexport_importers": []
+ },
+ {
+  "file": "src/z0int/outcome_randomized_evidence.py",
+  "line": "19",
+  "col": "5",
+  "mod": ".outcome_coverage._observation_key",
+  "sym": "_observation_key",
+  "reexport_importers": []
+ },
+ {
+  "file": "src/z0int/outcome_verifier.py",
+  "line": "36",
+  "col": "8",
+  "mod": "sys",
+  "sym": "sys",
+  "reexport_importers": []
+ },
+ {
+  "file": "src/z0int/posture.py",
+  "line": "36",
+  "col": "44",
+  "mod": "dataclasses.field",
+  "sym": "field",
+  "reexport_importers": []
+ },
+ {
+  "file": "src/z0int/preflight.py",
+  "line": "11",
+  "col": "8",
+  "mod": "re",
+  "sym": "re",
+  "reexport_importers": []
+ },
+ {
+  "file": "src/z0int/refinement.py",
+  "line": "23",
+  "col": "20",
+  "mod": ".routines.LiteralPredicate",
+  "sym": "LiteralPredicate",
+  "reexport_importers": []
+ },
+ {
+  "file": "src/z0int/routines.py",
+  "line": "32",
+  "col": "34",
+  "mod": "collections.defaultdict",
+  "sym": "defaultdict",
+  "reexport_importers": []
+ },
+ {
+  "file": "src/z0int/status.py",
+  "line": "7",
+  "col": "23",
+  "mod": ".models_mgmt",
+  "sym": "models_mgmt",
+  "reexport_importers": []
+ },
+ {
+  "file": "src/z0int/task_loop.py",
+  "line": "17",
+  "col": "8",
+  "mod": "hashlib",
+  "sym": "hashlib",
+  "reexport_importers": []
+ },
+ {
+  "file": "src/z0int/task_loop.py",
+  "line": "19",
+  "col": "8",
+  "mod": "os",
+  "sym": "os",
+  "reexport_importers": []
+ },
+ {
+  "file": "src/z0int/task_loop.py",
+  "line": "20",
+  "col": "8",
+  "mod": "shutil",
+  "sym": "shutil",
+  "reexport_importers": []
+ },
+ {
+  "file": "src/z0int/task_loop.py",
+  "line": "37",
+  "col": "5",
+  "mod": ".context_resolve.ContextPacket",
+  "sym": "ContextPacket",
+  "reexport_importers": []
+ },
+ {
+  "file": "src/z0int/worker_routing.py",
+  "line": "9",
+  "col": "8",
+  "mod": "sys",
+  "sym": "sys",
+  "reexport_importers": []
+ },
+ {
+  "file": "tests/fixtures/hermes_host_driver.py",
+  "line": "13",
+  "col": "8",
+  "mod": "sys",
+  "sym": "sys",
+  "reexport_importers": []
+ },
+ {
+  "file": "tests/test_backend_contract.py",
+  "line": "6",
+  "col": "21",
+  "mod": "pathlib.Path",
+  "sym": "Path",
+  "reexport_importers": []
+ },
+ {
+  "file": "tests/test_bend_gate.py",
+  "line": "12",
+  "col": "8",
+  "mod": "os",
+  "sym": "os",
+  "reexport_importers": []
+ },
+ {
+  "file": "tests/test_bootstrap.py",
+  "line": "13",
+  "col": "43",
+  "mod": "z0int.backends.bench.contract.CAPABILITIES",
+  "sym": "CAPABILITIES",
+  "reexport_importers": []
+ },
+ {
+  "file": "tests/test_bridge_decision.py",
+  "line": "5",
+  "col": "8",
+  "mod": "json",
+  "sym": "json",
+  "reexport_importers": []
+ },
+ {
+  "file": "tests/test_bridge_decision.py",
+  "line": "6",
+  "col": "8",
+  "mod": "os",
+  "sym": "os",
+  "reexport_importers": []
+ },
+ {
+  "file": "tests/test_bridge_decision.py",
+  "line": "7",
+  "col": "8",
+  "mod": "tempfile",
+  "sym": "tempfile",
+  "reexport_importers": []
+ },
+ {
+  "file": "tests/test_bridge_decision.py",
+  "line": "8",
+  "col": "8",
+  "mod": "threading",
+  "sym": "threading",
+  "reexport_importers": []
+ },
+ {
+  "file": "tests/test_bridge_decision.py",
+  "line": "12",
+  "col": "20",
+  "mod": "typing.Any",
+  "sym": "Any",
+  "reexport_importers": []
+ },
+ {
+  "file": "tests/test_bridge_decision.py",
+  "line": "24",
+  "col": "41",
+  "mod": "z0int.bridge.decision_cache.BackendLoadState",
+  "sym": "BackendLoadState",
+  "reexport_importers": []
+ },
+ {
+  "file": "tests/test_claude_code_adapter.py",
+  "line": "1",
+  "col": "8",
+  "mod": "io",
+  "sym": "io",
+  "reexport_importers": []
+ },
+ {
+  "file": "tests/test_claude_code_engagement.py",
+  "line": "6",
+  "col": "19",
+  "mod": "z0int.claude_code",
+  "sym": "claude_code",
+  "reexport_importers": []
+ },
+ {
+  "file": "tests/test_cognition_adapters.py",
+  "line": "18",
+  "col": "5",
+  "mod": "z0int.cognition.adapters.dialects.ToolDialect",
+  "sym": "ToolDialect",
+  "reexport_importers": []
+ },
+ {
+  "file": "tests/test_cognition_adapters.py",
+  "line": "25",
+  "col": "5",
+  "mod": "z0int.cognition.adapters.local_slm.ToolDecision",
+  "sym": "ToolDecision",
+  "reexport_importers": []
+ },
+ {
+  "file": "tests/test_cognition_candidates.py",
+  "line": "18",
+  "col": "5",
+  "mod": "z0int.cognition.candidates.QUALITY_CLASSES",
+  "sym": "QUALITY_CLASSES",
+  "reexport_importers": []
+ },
+ {
+  "file": "tests/test_cognition_manifest.py",
+  "line": "13",
+  "col": "5",
+  "mod": "z0int.cognition.manifest.LocalCognitionManifest",
+  "sym": "LocalCognitionManifest",
+  "reexport_importers": []
+ },
+ {
+  "file": "tests/test_cognition_server.py",
+  "line": "18",
+  "col": "5",
+  "mod": "z0int.cognition.server.ModelSupervisor",
+  "sym": "ModelSupervisor",
+  "reexport_importers": []
+ },
+ {
+  "file": "tests/test_cognition_surface.py",
+  "line": "22",
+  "col": "5",
+  "mod": "z0int.cognition.candidates.CapabilityProfile",
+  "sym": "CapabilityProfile",
+  "reexport_importers": []
+ },
+ {
+  "file": "tests/test_cognition_surface.py",
+  "line": "36",
+  "col": "5",
+  "mod": "z0int.cognition.receipts.ExecutionOutcome",
+  "sym": "ExecutionOutcome",
+  "reexport_importers": []
+ },
+ {
+  "file": "tests/test_free_only.py",
+  "line": "1",
+  "col": "8",
+  "mod": "copy",
+  "sym": "copy",
+  "reexport_importers": []
+ },
+ {
+  "file": "tests/test_free_only.py",
+  "line": "1",
+  "col": "13",
+  "mod": "json",
+  "sym": "json",
+  "reexport_importers": []
+ },
+ {
+  "file": "tests/test_functions_verify.py",
+  "line": "21",
+  "col": "5",
+  "mod": "z0int.functions.PhysicalCall",
+  "sym": "PhysicalCall",
+  "reexport_importers": []
+ },
+ {
+  "file": "tests/test_hermes_file_search_plugin.py",
+  "line": "12",
+  "col": "42",
+  "mod": "test_shared_file_search.repository",
+  "sym": "repository",
+  "reexport_importers": []
+ },
+ {
+  "file": "tests/test_hermes_file_search_plugin.py",
+  "line": "12",
+  "col": "67",
+  "mod": "test_shared_file_search.service",
+  "sym": "service",
+  "reexport_importers": []
+ },
+ {
+  "file": "tests/test_hot_path.py",
+  "line": "4",
+  "col": "8",
+  "mod": "pytest",
+  "sym": "pytest",
+  "reexport_importers": []
+ },
+ {
+  "file": "tests/test_intelligence.py",
+  "line": "3",
+  "col": "8",
+  "mod": "threading",
+  "sym": "threading",
+  "reexport_importers": []
+ },
+ {
+  "file": "tests/test_intelligence_service.py",
+  "line": "29",
+  "col": "66",
+  "mod": "z0int.intelligence_service.metrics_text",
+  "sym": "metrics_text",
+  "reexport_importers": []
+ },
+ {
+  "file": "tests/test_intelligence_service.py",
+  "line": "51",
+  "col": "12",
+  "mod": "json",
+  "sym": "json",
+  "reexport_importers": []
+ },
+ {
+  "file": "tests/test_julia_backend.py",
+  "line": "10",
+  "col": "8",
+  "mod": "subprocess",
+  "sym": "subprocess",
+  "reexport_importers": []
+ },
+ {
+  "file": "tests/test_memory_sources.py",
+  "line": "8",
+  "col": "8",
+  "mod": "time",
+  "sym": "time",
+  "reexport_importers": []
+ },
+ {
+  "file": "tests/test_memory_sources.py",
+  "line": "10",
+  "col": "21",
+  "mod": "pathlib.Path",
+  "sym": "Path",
+  "reexport_importers": []
+ },
+ {
+  "file": "tests/test_nanojev_parity.py",
+  "line": "11",
+  "col": "8",
+  "mod": "subprocess",
+  "sym": "subprocess",
+  "reexport_importers": []
+ },
+ {
+  "file": "tests/test_omp_capture.py",
+  "line": "21",
+  "col": "8",
+  "mod": "threading",
+  "sym": "threading",
+  "reexport_importers": []
+ },
+ {
+  "file": "tests/test_outcome_verifier.py",
+  "line": "5",
+  "col": "21",
+  "mod": "pathlib.Path",
+  "sym": "Path",
+  "reexport_importers": []
+ },
+ {
+  "file": "tests/test_policy_compile.py",
+  "line": "3",
+  "col": "22",
+  "mod": "datetime.datetime",
+  "sym": "datetime",
+  "reexport_importers": []
+ },
+ {
+  "file": "tests/test_policy_compile.py",
+  "line": "3",
+  "col": "32",
+  "mod": "datetime.timezone",
+  "sym": "timezone",
+  "reexport_importers": []
+ },
+ {
+  "file": "tests/test_provider_saturation.py",
+  "line": "2",
+  "col": "8",
+  "mod": "concurrent.futures",
+  "sym": "futures",
+  "reexport_importers": []
+ },
+ {
+  "file": "tests/test_quota_budget.py",
+  "line": "1",
+  "col": "8",
+  "mod": "importlib.util",
+  "sym": "util",
+  "reexport_importers": []
+ },
+ {
+  "file": "tests/test_quota_budget.py",
+  "line": "2",
+  "col": "21",
+  "mod": "pathlib.Path",
+  "sym": "Path",
+  "reexport_importers": []
+ },
+ {
+  "file": "tests/test_suite_isolation.py",
+  "line": "5",
+  "col": "21",
+  "mod": "pathlib.Path",
+  "sym": "Path",
+  "reexport_importers": []
+ },
+ {
+  "file": "tests/test_task_loop.py",
+  "line": "12",
+  "col": "5",
+  "mod": "z0int.task_loop.PatchSpec",
+  "sym": "PatchSpec",
+  "reexport_importers": []
+ },
+ {
+  "file": "tests/test_tokenomics_bridge.py",
+  "line": "18",
+  "col": "5",
+  "mod": "z0int.backends.bench.materialize.materialize_trace",
+  "sym": "materialize_trace",
+  "reexport_importers": []
+ },
+ {
+  "file": "tests/test_tokenomics_bridge.py",
+  "line": "188",
+  "col": "58",
+  "mod": "z0int.backends.base.DecisionResult",
+  "sym": "DecisionResult",
+  "reexport_importers": []
+ },
+ {
+  "file": "tests/test_vllm_route.py",
+  "line": "15",
+  "col": "5",
+  "mod": "openjev_phase1.vllm_route.template.answer_line",
+  "sym": "answer_line",
+  "reexport_importers": []
+ },
+ {
+  "file": "tests/test_worker_routing.py",
+  "line": "2",
+  "col": "8",
+  "mod": "importlib.util",
+  "sym": "util",
+  "reexport_importers": []
+ },
+ {
+  "file": "tests/test_worker_routing.py",
+  "line": "2",
+  "col": "23",
+  "mod": "json",
+  "sym": "json",
+  "reexport_importers": []
+ },
+ {
+  "file": "tests/test_worker_routing.py",
+  "line": "2",
+  "col": "36",
+  "mod": "sys",
+  "sym": "sys",
+  "reexport_importers": []
+ },
+ {
+  "file": "tests/test_z0int_refinement.py",
+  "line": "3",
+  "col": "8",
+  "mod": "copy",
+  "sym": "copy",
+  "reexport_importers": []
+ },
+ {
+  "file": "tests/test_z0int_refinement.py",
+  "line": "4",
+  "col": "8",
+  "mod": "json",
+  "sym": "json",
+  "reexport_importers": []
+ },
+ {
+  "file": "tests/test_z0int_routines.py",
+  "line": "3",
+  "col": "8",
+  "mod": "json",
+  "sym": "json",
+  "reexport_importers": []
+ }
+]

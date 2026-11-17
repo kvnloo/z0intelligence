@@ -1,0 +1,80 @@
+findings=118 zero-ref=79 guarded=18
+  60% unused variable        src/z0int/abab.py:50 joules_per_success
+  60% unused variable        src/z0int/abab.py:52 frontier_tokens_saved
+  60% unused variable        src/z0int/abab.py:76 hypothesis_id  [guarded]
+  60% unused variable        src/z0int/abab.py:154 transfer_retention_floor  [guarded]
+  60% unused variable        src/z0int/abab.py:281 n_good  [guarded]
+  60% unused variable        src/z0int/abab.py:282 n_bad  [guarded]
+  60% unused variable        src/z0int/abab.py:283 good_accept_rate  [guarded]
+  60% unused variable        src/z0int/abab.py:284 bad_reject_rate  [guarded]
+  60% unused function        src/z0int/ao_report.py:45 _latest_ao_receipts
+  60% unused variable        src/z0int/aodl.py:284 graph_id
+  60% unused function        src/z0int/aodl.py:753 spend_from_decision
+  60% unused variable        src/z0int/autoresearch/replay.py:95 arms_spec
+  60% unused variable        src/z0int/autoresearch/resources.py:21 GPU_TRAIN
+  60% unused function        src/z0int/autoresearch/retrieval_exec.py:41 backend_health
+  60% unused function        src/z0int/autoresearch/retrieval_exec.py:264 recipe_schema_ok
+  60% unused variable        src/z0int/autoresearch/schema.py:14 task_snapshot_ids  [guarded]
+  60% unused variable        src/z0int/autoresearch/schema.py:16 control_treatment_hash  [guarded]
+  60% unused variable        src/z0int/autoresearch/schema.py:17 challenger_treatment_hash  [guarded]
+  60% unused variable        src/z0int/autoresearch/schema.py:20 primary_metric
+  60% unused variable        src/z0int/autoresearch/schema.py:21 quality_margin
+  60% unused variable        src/z0int/backends/base.py:144 shared_prefix
+  60% unused variable        src/z0int/backends/base.py:145 supports_batch_questions
+  60% unused variable        src/z0int/backends/base.py:146 supports_observed_outcome_training
+  60% unused variable        src/z0int/backends/base.py:147 supports_soft_distribution_training
+  60% unused variable        src/z0int/backends/bench/eligibility.py:21 EligibilityStatus
+  60% unused function        src/z0int/backends/bench/metrics.py:12 _pred_str
+  60% unused variable        src/z0int/backends/julia.py:47 ALIASES
+  60% unused attribute       src/z0int/bridge/decision_cache.py:123 _warm_thread
+  60% unused function        src/z0int/bridge/runtime.py:81 clear_session_open
+  60% unused function        src/z0int/capabilities/context_project_state.py:137 evaluate_and_store
+  60% unused function        src/z0int/capabilities/context_project_state.py:178 load_families_jsonl
+  60% unused variable        src/z0int/cascade.py:61 fallback_rate
+  60% unused variable        src/z0int/cascade.py:163 escalations
+  60% unused variable        src/z0int/claude_code_engagement.py:38 LEAN_ROUTE_TOOL
+  60% unused variable        src/z0int/claude_code_engagement.py:46 MCP_INSTRUCTIONS
+  60% unused function        src/z0int/claude_code_engagement.py:235 packet_mode
+  60% unused function        src/z0int/claude_code_engagement.py:268 gated_packet
+  60% unused variable        src/z0int/claude_code_tokenomics.py:52 PROFILE_ENV
+  60% unused function        src/z0int/claude_code_tokenomics.py:501 events_for_stop
+  60% unused property        src/z0int/cognition/actions.py:87 irreversible  [guarded]
+  60% unused method          src/z0int/cognition/actions.py:236 actions_for_kind
+  60% unused attribute       src/z0int/cognition/adapters/local_slm.py:188 _capability
+  60% unused method          src/z0int/cognition/candidates.py:159 satisfies
+  60% unused method          src/z0int/cognition/candidates.py:774 allowed_for
+  60% unused variable        src/z0int/cognition/escalation.py:18 EscalationTier
+  60% unused variable        src/z0int/cognition/escalation.py:94 expected_utility
+  60% unused variable        src/z0int/cognition/receipts.py:76 budget_ms  [guarded]
+  60% unused variable        src/z0int/cognition/receipts.py:80 queue_wait_ms
+  60% unused variable        src/z0int/cognition/receipts.py:82 observed_by
+  60% unused variable        src/z0int/cognition/receipts.py:125 gpu_vram_mib  [guarded]
+  60% unused variable        src/z0int/cognition/server.py:269 server_version
+  60% unused method          src/z0int/cognition/surface.py:164 eligible_for_tier  [guarded]
+  60% unused variable        src/z0int/contrastive_evidence.py:32 BaseCondition
+  60% unused function        src/z0int/contrastive_evidence.py:498 family_fingerprint
+  60% unused variable        src/z0int/credit.py:47 candidate_success
+  60% unused variable        src/z0int/credit.py:50 lower_95
+  60% unused variable        src/z0int/credit.py:51 upper_95
+  60% unused variable        src/z0int/file_search.py:92 last_used
+  60% unused attribute       src/z0int/file_search.py:128 last_used
+  60% unused attribute       src/z0int/file_search.py:308 last_used
+  60% unused variable        src/z0int/intelligence_service.py:115 request_queue_size
+  60% unused function        src/z0int/memory/sources.py:222 is_pi_session
+  60% unused method          src/z0int/memory_contract.py:157 same_source_event
+  60% unused variable        src/z0int/memory_contract.py:239 valid_to
+  60% unused variable        src/z0int/memory_contract.py:245 derived_from_untrusted
+  60% unused method          src/z0int/memory_mcp_backends.py:73 makefile
+  60% unused variable        src/z0int/remote_executor.py:72 request_queue_size
+  60% unused variable        src/z0int/routines.py:135 global_prior_precision
+  60% unused variable        src/z0int/routines.py:138 lift_passes_2sigma
+  60% unused variable        src/z0int/task_loop.py:91 authorized_at  [guarded]
+  60% unused variable        src/z0int/task_loop.py:99 context_packet_path
+  60% unused variable        src/z0int/task_loop.py:101 aodl_source_hash
+  60% unused variable        src/z0int/task_loop.py:102 verifier_kind
+  60% unused attribute       src/z0int/task_loop.py:298 context_packet_path
+  60% unused attribute       src/z0int/task_loop.py:300 aodl_source_hash
+  60% unused variable        src/z0int/turn_readers.py:56 TEST_LABEL_POLARITIES
+  60% unused variable        src/z0int/utilization.py:462 api_calls
+  60% unused variable        src/z0int/verification_density.py:50 TURN_TYPES
+  60% unused function        src/z0int/worker_routing.py:176 oauth_module

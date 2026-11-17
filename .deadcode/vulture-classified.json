@@ -1,0 +1,2075 @@
+[
+ {
+  "file": "src/openjev_phase1/jevlike/bridge.py",
+  "line": "14",
+  "kind": "unused function",
+  "name": "choice_to_openjev_row",
+  "conf": "60",
+  "guarded": false,
+  "hits": {
+   "attr": [
+    "docs/jevlike-trainable-route.md"
+   ],
+   "dotted": [
+    "docs/jevlike-trainable-route.md"
+   ],
+   "str": [],
+   "call": []
+  },
+  "total": 1,
+  "class": "dead-func"
+ },
+ {
+  "file": "src/z0int/abab.py",
+  "line": "50",
+  "kind": "unused variable",
+  "name": "joules_per_success",
+  "conf": "60",
+  "guarded": false,
+  "hits": {
+   "attr": [],
+   "dotted": [],
+   "str": [],
+   "call": []
+  },
+  "total": 0,
+  "class": "field"
+ },
+ {
+  "file": "src/z0int/abab.py",
+  "line": "52",
+  "kind": "unused variable",
+  "name": "frontier_tokens_saved",
+  "conf": "60",
+  "guarded": false,
+  "hits": {
+   "attr": [],
+   "dotted": [],
+   "str": [],
+   "call": []
+  },
+  "total": 0,
+  "class": "field"
+ },
+ {
+  "file": "src/z0int/abab.py",
+  "line": "76",
+  "kind": "unused variable",
+  "name": "hypothesis_id",
+  "conf": "60",
+  "guarded": true,
+  "hits": {
+   "attr": [],
+   "dotted": [],
+   "str": [],
+   "call": []
+  },
+  "total": 0,
+  "class": "field"
+ },
+ {
+  "file": "src/z0int/abab.py",
+  "line": "154",
+  "kind": "unused variable",
+  "name": "transfer_retention_floor",
+  "conf": "60",
+  "guarded": true,
+  "hits": {
+   "attr": [],
+   "dotted": [],
+   "str": [],
+   "call": []
+  },
+  "total": 0,
+  "class": "field"
+ },
+ {
+  "file": "src/z0int/abab.py",
+  "line": "281",
+  "kind": "unused variable",
+  "name": "n_good",
+  "conf": "60",
+  "guarded": true,
+  "hits": {
+   "attr": [],
+   "dotted": [],
+   "str": [],
+   "call": []
+  },
+  "total": 0,
+  "class": "field"
+ },
+ {
+  "file": "src/z0int/abab.py",
+  "line": "282",
+  "kind": "unused variable",
+  "name": "n_bad",
+  "conf": "60",
+  "guarded": true,
+  "hits": {
+   "attr": [],
+   "dotted": [],
+   "str": [],
+   "call": []
+  },
+  "total": 0,
+  "class": "field"
+ },
+ {
+  "file": "src/z0int/abab.py",
+  "line": "283",
+  "kind": "unused variable",
+  "name": "good_accept_rate",
+  "conf": "60",
+  "guarded": true,
+  "hits": {
+   "attr": [],
+   "dotted": [],
+   "str": [],
+   "call": []
+  },
+  "total": 0,
+  "class": "field"
+ },
+ {
+  "file": "src/z0int/abab.py",
+  "line": "284",
+  "kind": "unused variable",
+  "name": "bad_reject_rate",
+  "conf": "60",
+  "guarded": true,
+  "hits": {
+   "attr": [],
+   "dotted": [],
+   "str": [],
+   "call": []
+  },
+  "total": 0,
+  "class": "field"
+ },
+ {
+  "file": "src/z0int/ao_report.py",
+  "line": "45",
+  "kind": "unused function",
+  "name": "_latest_ao_receipts",
+  "conf": "60",
+  "guarded": false,
+  "hits": {
+   "attr": [],
+   "dotted": [],
+   "str": [],
+   "call": []
+  },
+  "total": 0,
+  "class": "dead-func"
+ },
+ {
+  "file": "src/z0int/aodl.py",
+  "line": "284",
+  "kind": "unused variable",
+  "name": "graph_id",
+  "conf": "60",
+  "guarded": false,
+  "hits": {
+   "attr": [],
+   "dotted": [],
+   "str": [],
+   "call": []
+  },
+  "total": 0,
+  "class": "field"
+ },
+ {
+  "file": "src/z0int/aodl.py",
+  "line": "753",
+  "kind": "unused function",
+  "name": "spend_from_decision",
+  "conf": "60",
+  "guarded": false,
+  "hits": {
+   "attr": [],
+   "dotted": [],
+   "str": [],
+   "call": []
+  },
+  "total": 0,
+  "class": "dead-func"
+ },
+ {
+  "file": "src/z0int/autoresearch/queue.py",
+  "line": "15",
+  "kind": "unused attribute",
+  "name": "row_factory",
+  "conf": "60",
+  "guarded": false,
+  "hits": {
+   "attr": [
+    "adapters/hermes_z0int/native_capture.py",
+    "src/z0int/cognition/learning.py",
+    "src/z0int/os_context.py",
+    "tests/test_learning_families.py",
+    "tests/test_learning_search.py"
+   ],
+   "dotted": [],
+   "str": [],
+   "call": []
+  },
+  "total": 5,
+  "class": "field"
+ },
+ {
+  "file": "src/z0int/autoresearch/replay.py",
+  "line": "95",
+  "kind": "unused variable",
+  "name": "arms_spec",
+  "conf": "60",
+  "guarded": false,
+  "hits": {
+   "attr": [],
+   "dotted": [],
+   "str": [],
+   "call": []
+  },
+  "total": 0,
+  "class": "dead-var"
+ },
+ {
+  "file": "src/z0int/autoresearch/resources.py",
+  "line": "21",
+  "kind": "unused variable",
+  "name": "GPU_TRAIN",
+  "conf": "60",
+  "guarded": false,
+  "hits": {
+   "attr": [],
+   "dotted": [],
+   "str": [],
+   "call": []
+  },
+  "total": 0,
+  "class": "dead-attr"
+ },
+ {
+  "file": "src/z0int/autoresearch/retrieval_exec.py",
+  "line": "41",
+  "kind": "unused function",
+  "name": "backend_health",
+  "conf": "60",
+  "guarded": false,
+  "hits": {
+   "attr": [],
+   "dotted": [],
+   "str": [],
+   "call": []
+  },
+  "total": 0,
+  "class": "dead-func"
+ },
+ {
+  "file": "src/z0int/autoresearch/retrieval_exec.py",
+  "line": "264",
+  "kind": "unused function",
+  "name": "recipe_schema_ok",
+  "conf": "60",
+  "guarded": false,
+  "hits": {
+   "attr": [],
+   "dotted": [],
+   "str": [],
+   "call": []
+  },
+  "total": 0,
+  "class": "dead-func"
+ },
+ {
+  "file": "src/z0int/autoresearch/schema.py",
+  "line": "14",
+  "kind": "unused variable",
+  "name": "task_snapshot_ids",
+  "conf": "60",
+  "guarded": true,
+  "hits": {
+   "attr": [],
+   "dotted": [],
+   "str": [],
+   "call": []
+  },
+  "total": 0,
+  "class": "field"
+ },
+ {
+  "file": "src/z0int/autoresearch/schema.py",
+  "line": "15",
+  "kind": "unused variable",
+  "name": "hypothesis",
+  "conf": "60",
+  "guarded": true,
+  "hits": {
+   "attr": [],
+   "dotted": [],
+   "str": [
+    "benchmarks/build_wanli.py",
+    "benchmarks/julia_claims/published_claims.py",
+    "src/z0int/autoresearch/mutations.py",
+    "src/z0int/cognition/learning.py",
+    "tests/test_shadow_learning.py"
+   ],
+   "call": []
+  },
+  "total": 5,
+  "class": "field"
+ },
+ {
+  "file": "src/z0int/autoresearch/schema.py",
+  "line": "16",
+  "kind": "unused variable",
+  "name": "control_treatment_hash",
+  "conf": "60",
+  "guarded": true,
+  "hits": {
+   "attr": [],
+   "dotted": [],
+   "str": [],
+   "call": []
+  },
+  "total": 0,
+  "class": "field"
+ },
+ {
+  "file": "src/z0int/autoresearch/schema.py",
+  "line": "17",
+  "kind": "unused variable",
+  "name": "challenger_treatment_hash",
+  "conf": "60",
+  "guarded": true,
+  "hits": {
+   "attr": [],
+   "dotted": [],
+   "str": [],
+   "call": []
+  },
+  "total": 0,
+  "class": "field"
+ },
+ {
+  "file": "src/z0int/autoresearch/schema.py",
+  "line": "18",
+  "kind": "unused variable",
+  "name": "mutation_axis",
+  "conf": "60",
+  "guarded": false,
+  "hits": {
+   "attr": [],
+   "dotted": [],
+   "str": [
+    "src/z0int/autoresearch/daemon.py",
+    "src/z0int/autoresearch/queue.py"
+   ],
+   "call": []
+  },
+  "total": 2,
+  "class": "field"
+ },
+ {
+  "file": "src/z0int/autoresearch/schema.py",
+  "line": "20",
+  "kind": "unused variable",
+  "name": "primary_metric",
+  "conf": "60",
+  "guarded": false,
+  "hits": {
+   "attr": [],
+   "dotted": [],
+   "str": [],
+   "call": []
+  },
+  "total": 0,
+  "class": "field"
+ },
+ {
+  "file": "src/z0int/autoresearch/schema.py",
+  "line": "21",
+  "kind": "unused variable",
+  "name": "quality_margin",
+  "conf": "60",
+  "guarded": false,
+  "hits": {
+   "attr": [],
+   "dotted": [],
+   "str": [],
+   "call": []
+  },
+  "total": 0,
+  "class": "field"
+ },
+ {
+  "file": "src/z0int/autoresearch/schema.py",
+  "line": "39",
+  "kind": "unused variable",
+  "name": "frontier_tokens",
+  "conf": "60",
+  "guarded": false,
+  "hits": {
+   "attr": [],
+   "dotted": [],
+   "str": [
+    "src/z0int/ao_report.py",
+    "src/z0int/autoresearch/replay.py",
+    "src/z0int/bridge/runtime.py",
+    "tests/test_ao_report.py",
+    "tests/test_network_cutover_phase_a.py"
+   ],
+   "call": []
+  },
+  "total": 5,
+  "class": "field"
+ },
+ {
+  "file": "src/z0int/autoresearch/schema.py",
+  "line": "41",
+  "kind": "unused variable",
+  "name": "cpu_ms",
+  "conf": "60",
+  "guarded": false,
+  "hits": {
+   "attr": [],
+   "dotted": [],
+   "str": [
+    "examples/jevlike/doom/play.py",
+    "src/z0int/autoresearch/replay.py"
+   ],
+   "call": []
+  },
+  "total": 2,
+  "class": "field"
+ },
+ {
+  "file": "src/z0int/backends/base.py",
+  "line": "141",
+  "kind": "unused variable",
+  "name": "trainable",
+  "conf": "60",
+  "guarded": false,
+  "hits": {
+   "attr": [],
+   "dotted": [],
+   "str": [
+    "src/openjev_phase1/jevlike/bridge.py"
+   ],
+   "call": []
+  },
+  "total": 1,
+  "class": "field"
+ },
+ {
+  "file": "src/z0int/backends/base.py",
+  "line": "144",
+  "kind": "unused variable",
+  "name": "shared_prefix",
+  "conf": "60",
+  "guarded": false,
+  "hits": {
+   "attr": [],
+   "dotted": [],
+   "str": [],
+   "call": []
+  },
+  "total": 0,
+  "class": "field"
+ },
+ {
+  "file": "src/z0int/backends/base.py",
+  "line": "145",
+  "kind": "unused variable",
+  "name": "supports_batch_questions",
+  "conf": "60",
+  "guarded": false,
+  "hits": {
+   "attr": [],
+   "dotted": [],
+   "str": [],
+   "call": []
+  },
+  "total": 0,
+  "class": "field"
+ },
+ {
+  "file": "src/z0int/backends/base.py",
+  "line": "146",
+  "kind": "unused variable",
+  "name": "supports_observed_outcome_training",
+  "conf": "60",
+  "guarded": false,
+  "hits": {
+   "attr": [],
+   "dotted": [],
+   "str": [],
+   "call": []
+  },
+  "total": 0,
+  "class": "field"
+ },
+ {
+  "file": "src/z0int/backends/base.py",
+  "line": "147",
+  "kind": "unused variable",
+  "name": "supports_soft_distribution_training",
+  "conf": "60",
+  "guarded": false,
+  "hits": {
+   "attr": [],
+   "dotted": [],
+   "str": [],
+   "call": []
+  },
+  "total": 0,
+  "class": "field"
+ },
+ {
+  "file": "src/z0int/backends/bench/eligibility.py",
+  "line": "21",
+  "kind": "unused variable",
+  "name": "EligibilityStatus",
+  "conf": "60",
+  "guarded": false,
+  "hits": {
+   "attr": [],
+   "dotted": [],
+   "str": [],
+   "call": []
+  },
+  "total": 0,
+  "class": "dead-var"
+ },
+ {
+  "file": "src/z0int/backends/bench/metrics.py",
+  "line": "12",
+  "kind": "unused function",
+  "name": "_pred_str",
+  "conf": "60",
+  "guarded": false,
+  "hits": {
+   "attr": [],
+   "dotted": [],
+   "str": [],
+   "call": []
+  },
+  "total": 0,
+  "class": "dead-func"
+ },
+ {
+  "file": "src/z0int/backends/bench/tokenomics_bridge.py",
+  "line": "152",
+  "kind": "unused variable",
+  "name": "z0int_git_sha",
+  "conf": "60",
+  "guarded": false,
+  "hits": {
+   "attr": [],
+   "dotted": [],
+   "str": [
+    "results/decision-backends/20260930-mbp-dcv1/run-manifest.json",
+    "results/decision-backends/20260930-mbp-tfs-sealed77/run-manifest.json",
+    "src/z0int/backends/bench/run_manifest.py",
+    "tests/fixtures/tokenomics-bench-parity/four-way/MANIFEST.json"
+   ],
+   "call": []
+  },
+  "total": 4,
+  "class": "field"
+ },
+ {
+  "file": "src/z0int/backends/julia.py",
+  "line": "47",
+  "kind": "unused variable",
+  "name": "ALIASES",
+  "conf": "60",
+  "guarded": false,
+  "hits": {
+   "attr": [],
+   "dotted": [],
+   "str": [],
+   "call": []
+  },
+  "total": 0,
+  "class": "dead-var"
+ },
+ {
+  "file": "src/z0int/bend_gate.py",
+  "line": "554",
+  "kind": "unused function",
+  "name": "build_kernel",
+  "conf": "60",
+  "guarded": false,
+  "hits": {
+   "attr": [
+    "tests/test_bend_gate.py"
+   ],
+   "dotted": [
+    "tests/test_bend_gate.py"
+   ],
+   "str": [],
+   "call": [
+    "bend/aodl_gate/README.md",
+    "tests/test_bend_gate.py"
+   ]
+  },
+  "total": 2,
+  "class": "dead-func"
+ },
+ {
+  "file": "src/z0int/bridge/decision_cache.py",
+  "line": "123",
+  "kind": "unused attribute",
+  "name": "_warm_thread",
+  "conf": "60",
+  "guarded": false,
+  "hits": {
+   "attr": [],
+   "dotted": [],
+   "str": [],
+   "call": []
+  },
+  "total": 0,
+  "class": "dead-attr"
+ },
+ {
+  "file": "src/z0int/bridge/runtime.py",
+  "line": "81",
+  "kind": "unused function",
+  "name": "clear_session_open",
+  "conf": "60",
+  "guarded": false,
+  "hits": {
+   "attr": [],
+   "dotted": [],
+   "str": [],
+   "call": []
+  },
+  "total": 0,
+  "class": "dead-func"
+ },
+ {
+  "file": "src/z0int/capabilities/context_project_state.py",
+  "line": "137",
+  "kind": "unused function",
+  "name": "evaluate_and_store",
+  "conf": "60",
+  "guarded": false,
+  "hits": {
+   "attr": [],
+   "dotted": [],
+   "str": [],
+   "call": []
+  },
+  "total": 0,
+  "class": "dead-func"
+ },
+ {
+  "file": "src/z0int/capabilities/context_project_state.py",
+  "line": "178",
+  "kind": "unused function",
+  "name": "load_families_jsonl",
+  "conf": "60",
+  "guarded": false,
+  "hits": {
+   "attr": [],
+   "dotted": [],
+   "str": [],
+   "call": []
+  },
+  "total": 0,
+  "class": "dead-func"
+ },
+ {
+  "file": "src/z0int/cascade.py",
+  "line": "61",
+  "kind": "unused variable",
+  "name": "fallback_rate",
+  "conf": "60",
+  "guarded": false,
+  "hits": {
+   "attr": [],
+   "dotted": [],
+   "str": [],
+   "call": []
+  },
+  "total": 0,
+  "class": "field"
+ },
+ {
+  "file": "src/z0int/cascade.py",
+  "line": "163",
+  "kind": "unused variable",
+  "name": "escalations",
+  "conf": "60",
+  "guarded": false,
+  "hits": {
+   "attr": [],
+   "dotted": [],
+   "str": [],
+   "call": []
+  },
+  "total": 0,
+  "class": "field"
+ },
+ {
+  "file": "src/z0int/claude_code_engagement.py",
+  "line": "38",
+  "kind": "unused variable",
+  "name": "LEAN_ROUTE_TOOL",
+  "conf": "60",
+  "guarded": false,
+  "hits": {
+   "attr": [],
+   "dotted": [],
+   "str": [],
+   "call": []
+  },
+  "total": 0,
+  "class": "dead-var"
+ },
+ {
+  "file": "src/z0int/claude_code_engagement.py",
+  "line": "46",
+  "kind": "unused variable",
+  "name": "MCP_INSTRUCTIONS",
+  "conf": "60",
+  "guarded": false,
+  "hits": {
+   "attr": [],
+   "dotted": [],
+   "str": [],
+   "call": []
+  },
+  "total": 0,
+  "class": "dead-var"
+ },
+ {
+  "file": "src/z0int/claude_code_engagement.py",
+  "line": "235",
+  "kind": "unused function",
+  "name": "packet_mode",
+  "conf": "60",
+  "guarded": false,
+  "hits": {
+   "attr": [],
+   "dotted": [],
+   "str": [],
+   "call": []
+  },
+  "total": 0,
+  "class": "dead-func"
+ },
+ {
+  "file": "src/z0int/claude_code_engagement.py",
+  "line": "268",
+  "kind": "unused function",
+  "name": "gated_packet",
+  "conf": "60",
+  "guarded": false,
+  "hits": {
+   "attr": [],
+   "dotted": [],
+   "str": [],
+   "call": []
+  },
+  "total": 0,
+  "class": "dead-func"
+ },
+ {
+  "file": "src/z0int/claude_code_tokenomics.py",
+  "line": "52",
+  "kind": "unused variable",
+  "name": "PROFILE_ENV",
+  "conf": "60",
+  "guarded": false,
+  "hits": {
+   "attr": [],
+   "dotted": [],
+   "str": [],
+   "call": []
+  },
+  "total": 0,
+  "class": "dead-var"
+ },
+ {
+  "file": "src/z0int/claude_code_tokenomics.py",
+  "line": "501",
+  "kind": "unused function",
+  "name": "events_for_stop",
+  "conf": "60",
+  "guarded": false,
+  "hits": {
+   "attr": [],
+   "dotted": [],
+   "str": [],
+   "call": []
+  },
+  "total": 0,
+  "class": "dead-func"
+ },
+ {
+  "file": "src/z0int/cognition/actions.py",
+  "line": "87",
+  "kind": "unused property",
+  "name": "irreversible",
+  "conf": "60",
+  "guarded": true,
+  "hits": {
+   "attr": [],
+   "dotted": [],
+   "str": [],
+   "call": []
+  },
+  "total": 0,
+  "class": "other"
+ },
+ {
+  "file": "src/z0int/cognition/actions.py",
+  "line": "236",
+  "kind": "unused method",
+  "name": "actions_for_kind",
+  "conf": "60",
+  "guarded": false,
+  "hits": {
+   "attr": [],
+   "dotted": [],
+   "str": [],
+   "call": []
+  },
+  "total": 0,
+  "class": "fieldish-func"
+ },
+ {
+  "file": "src/z0int/cognition/adapters/local_slm.py",
+  "line": "188",
+  "kind": "unused attribute",
+  "name": "_capability",
+  "conf": "60",
+  "guarded": false,
+  "hits": {
+   "attr": [],
+   "dotted": [],
+   "str": [],
+   "call": []
+  },
+  "total": 0,
+  "class": "dead-attr"
+ },
+ {
+  "file": "src/z0int/cognition/candidates.py",
+  "line": "159",
+  "kind": "unused method",
+  "name": "satisfies",
+  "conf": "60",
+  "guarded": false,
+  "hits": {
+   "attr": [],
+   "dotted": [],
+   "str": [],
+   "call": []
+  },
+  "total": 0,
+  "class": "fieldish-func"
+ },
+ {
+  "file": "src/z0int/cognition/candidates.py",
+  "line": "216",
+  "kind": "unused variable",
+  "name": "annotations",
+  "conf": "60",
+  "guarded": false,
+  "hits": {
+   "attr": [],
+   "dotted": [],
+   "str": [
+    "src/z0int/memory_mcp.py",
+    "tests/test_memory_mcp.py"
+   ],
+   "call": []
+  },
+  "total": 2,
+  "class": "field"
+ },
+ {
+  "file": "src/z0int/cognition/candidates.py",
+  "line": "774",
+  "kind": "unused method",
+  "name": "allowed_for",
+  "conf": "60",
+  "guarded": false,
+  "hits": {
+   "attr": [],
+   "dotted": [],
+   "str": [],
+   "call": []
+  },
+  "total": 0,
+  "class": "dead-method"
+ },
+ {
+  "file": "src/z0int/cognition/escalation.py",
+  "line": "18",
+  "kind": "unused variable",
+  "name": "EscalationTier",
+  "conf": "60",
+  "guarded": false,
+  "hits": {
+   "attr": [],
+   "dotted": [],
+   "str": [],
+   "call": []
+  },
+  "total": 0,
+  "class": "dead-var"
+ },
+ {
+  "file": "src/z0int/cognition/escalation.py",
+  "line": "94",
+  "kind": "unused variable",
+  "name": "expected_utility",
+  "conf": "60",
+  "guarded": false,
+  "hits": {
+   "attr": [],
+   "dotted": [],
+   "str": [],
+   "call": []
+  },
+  "total": 0,
+  "class": "field"
+ },
+ {
+  "file": "src/z0int/cognition/learning.py",
+  "line": "69",
+  "kind": "unused attribute",
+  "name": "row_factory",
+  "conf": "60",
+  "guarded": false,
+  "hits": {
+   "attr": [
+    "adapters/hermes_z0int/native_capture.py",
+    "src/z0int/autoresearch/queue.py",
+    "src/z0int/os_context.py",
+    "tests/test_learning_families.py",
+    "tests/test_learning_search.py"
+   ],
+   "dotted": [],
+   "str": [],
+   "call": []
+  },
+  "total": 5,
+  "class": "field"
+ },
+ {
+  "file": "src/z0int/cognition/manifest.py",
+  "line": "76",
+  "kind": "unused variable",
+  "name": "measured_vram_mib",
+  "conf": "60",
+  "guarded": false,
+  "hits": {
+   "attr": [],
+   "dotted": [],
+   "str": [
+    "manifests/local_cognition.v1.json",
+    "src/z0int/cognition/probe.py"
+   ],
+   "call": []
+  },
+  "total": 2,
+  "class": "field"
+ },
+ {
+  "file": "src/z0int/cognition/manifest.py",
+  "line": "109",
+  "kind": "unused variable",
+  "name": "setup_note",
+  "conf": "60",
+  "guarded": false,
+  "hits": {
+   "attr": [],
+   "dotted": [],
+   "str": [
+    "manifests/local_cognition.v1.json"
+   ],
+   "call": []
+  },
+  "total": 1,
+  "class": "field"
+ },
+ {
+  "file": "src/z0int/cognition/manifest.py",
+  "line": "111",
+  "kind": "unused variable",
+  "name": "unverified",
+  "conf": "60",
+  "guarded": false,
+  "hits": {
+   "attr": [],
+   "dotted": [],
+   "str": [
+    "src/z0int/cognition/mutation_outcome.py",
+    "src/z0int/harness_capture.py",
+    "src/z0int/legacy_import.py",
+    "src/z0int/loop_export.py",
+    "src/z0int/outcome_verifier.py",
+    "src/z0int/verification_density.py",
+    "tests/fixtures/cc_export_6fee859.json",
+    "tests/test_cc_export_regression.py",
+    "tests/test_harness_capture.py",
+    "tests/test_intelligence_service_providers.py",
+    "tests/test_legacy_import.py",
+    "tests/test_loop_export.py"
+   ],
+   "call": [
+    "src/z0int/loop_export.py",
+    "src/z0int/verification_density.py"
+   ]
+  },
+  "total": 19,
+  "class": "field"
+ },
+ {
+  "file": "src/z0int/cognition/receipts.py",
+  "line": "66",
+  "kind": "unused variable",
+  "name": "reasoning_tokens",
+  "conf": "60",
+  "guarded": true,
+  "hits": {
+   "attr": [],
+   "dotted": [],
+   "str": [
+    "src/z0int/cognition/cascade.py"
+   ],
+   "call": []
+  },
+  "total": 1,
+  "class": "field"
+ },
+ {
+  "file": "src/z0int/cognition/receipts.py",
+  "line": "76",
+  "kind": "unused variable",
+  "name": "budget_ms",
+  "conf": "60",
+  "guarded": true,
+  "hits": {
+   "attr": [],
+   "dotted": [],
+   "str": [],
+   "call": []
+  },
+  "total": 0,
+  "class": "field"
+ },
+ {
+  "file": "src/z0int/cognition/receipts.py",
+  "line": "80",
+  "kind": "unused variable",
+  "name": "queue_wait_ms",
+  "conf": "60",
+  "guarded": false,
+  "hits": {
+   "attr": [],
+   "dotted": [],
+   "str": [],
+   "call": []
+  },
+  "total": 0,
+  "class": "field"
+ },
+ {
+  "file": "src/z0int/cognition/receipts.py",
+  "line": "82",
+  "kind": "unused variable",
+  "name": "observed_by",
+  "conf": "60",
+  "guarded": false,
+  "hits": {
+   "attr": [],
+   "dotted": [],
+   "str": [],
+   "call": []
+  },
+  "total": 0,
+  "class": "field"
+ },
+ {
+  "file": "src/z0int/cognition/receipts.py",
+  "line": "125",
+  "kind": "unused variable",
+  "name": "gpu_vram_mib",
+  "conf": "60",
+  "guarded": true,
+  "hits": {
+   "attr": [],
+   "dotted": [],
+   "str": [],
+   "call": []
+  },
+  "total": 0,
+  "class": "field"
+ },
+ {
+  "file": "src/z0int/cognition/receipts.py",
+  "line": "126",
+  "kind": "unused variable",
+  "name": "provider_cost_usd",
+  "conf": "60",
+  "guarded": true,
+  "hits": {
+   "attr": [],
+   "dotted": [],
+   "str": [
+    "src/z0int/cognition/cascade.py"
+   ],
+   "call": []
+  },
+  "total": 1,
+  "class": "field"
+ },
+ {
+  "file": "src/z0int/cognition/receipts.py",
+  "line": "127",
+  "kind": "unused variable",
+  "name": "provider_cost_units",
+  "conf": "60",
+  "guarded": false,
+  "hits": {
+   "attr": [],
+   "dotted": [],
+   "str": [
+    "src/z0int/cognition/cascade.py"
+   ],
+   "call": []
+  },
+  "total": 1,
+  "class": "field"
+ },
+ {
+  "file": "src/z0int/cognition/server.py",
+  "line": "268",
+  "kind": "unused variable",
+  "name": "protocol_version",
+  "conf": "60",
+  "guarded": false,
+  "hits": {
+   "attr": [],
+   "dotted": [],
+   "str": [
+    "schemas/agentweb-z0-bridge.v1.schema.json",
+    "src/z0int/agentweb_bridge.py",
+    "src/z0int/dispatch_authority.py",
+    "src/z0int/remote_executor.py",
+    "tests/test_agentweb_bridge.py",
+    "tests/test_dispatch_authority.py",
+    "tests/test_free_only.py",
+    "tests/test_intelligence_service.py",
+    "tests/test_provider_saturation.py"
+   ],
+   "call": []
+  },
+  "total": 9,
+  "class": "dead-attr"
+ },
+ {
+  "file": "src/z0int/cognition/server.py",
+  "line": "269",
+  "kind": "unused variable",
+  "name": "server_version",
+  "conf": "60",
+  "guarded": false,
+  "hits": {
+   "attr": [],
+   "dotted": [],
+   "str": [],
+   "call": []
+  },
+  "total": 0,
+  "class": "dead-attr"
+ },
+ {
+  "file": "src/z0int/cognition/surface.py",
+  "line": "164",
+  "kind": "unused method",
+  "name": "eligible_for_tier",
+  "conf": "60",
+  "guarded": true,
+  "hits": {
+   "attr": [],
+   "dotted": [],
+   "str": [],
+   "call": []
+  },
+  "total": 0,
+  "class": "fieldish-func"
+ },
+ {
+  "file": "src/z0int/contrastive_evidence.py",
+  "line": "32",
+  "kind": "unused variable",
+  "name": "BaseCondition",
+  "conf": "60",
+  "guarded": false,
+  "hits": {
+   "attr": [],
+   "dotted": [],
+   "str": [],
+   "call": []
+  },
+  "total": 0,
+  "class": "dead-var"
+ },
+ {
+  "file": "src/z0int/contrastive_evidence.py",
+  "line": "498",
+  "kind": "unused function",
+  "name": "family_fingerprint",
+  "conf": "60",
+  "guarded": false,
+  "hits": {
+   "attr": [],
+   "dotted": [],
+   "str": [],
+   "call": []
+  },
+  "total": 0,
+  "class": "dead-func"
+ },
+ {
+  "file": "src/z0int/credit.py",
+  "line": "47",
+  "kind": "unused variable",
+  "name": "candidate_success",
+  "conf": "60",
+  "guarded": false,
+  "hits": {
+   "attr": [],
+   "dotted": [],
+   "str": [],
+   "call": []
+  },
+  "total": 0,
+  "class": "field"
+ },
+ {
+  "file": "src/z0int/credit.py",
+  "line": "50",
+  "kind": "unused variable",
+  "name": "lower_95",
+  "conf": "60",
+  "guarded": false,
+  "hits": {
+   "attr": [],
+   "dotted": [],
+   "str": [],
+   "call": []
+  },
+  "total": 0,
+  "class": "field"
+ },
+ {
+  "file": "src/z0int/credit.py",
+  "line": "51",
+  "kind": "unused variable",
+  "name": "upper_95",
+  "conf": "60",
+  "guarded": false,
+  "hits": {
+   "attr": [],
+   "dotted": [],
+   "str": [],
+   "call": []
+  },
+  "total": 0,
+  "class": "field"
+ },
+ {
+  "file": "src/z0int/file_search.py",
+  "line": "92",
+  "kind": "unused variable",
+  "name": "last_used",
+  "conf": "60",
+  "guarded": false,
+  "hits": {
+   "attr": [],
+   "dotted": [],
+   "str": [],
+   "call": []
+  },
+  "total": 0,
+  "class": "field"
+ },
+ {
+  "file": "src/z0int/file_search.py",
+  "line": "128",
+  "kind": "unused attribute",
+  "name": "last_used",
+  "conf": "60",
+  "guarded": false,
+  "hits": {
+   "attr": [],
+   "dotted": [],
+   "str": [],
+   "call": []
+  },
+  "total": 0,
+  "class": "field"
+ },
+ {
+  "file": "src/z0int/file_search.py",
+  "line": "308",
+  "kind": "unused attribute",
+  "name": "last_used",
+  "conf": "60",
+  "guarded": false,
+  "hits": {
+   "attr": [],
+   "dotted": [],
+   "str": [],
+   "call": []
+  },
+  "total": 0,
+  "class": "field"
+ },
+ {
+  "file": "src/z0int/intelligence_service.py",
+  "line": "114",
+  "kind": "unused variable",
+  "name": "daemon_threads",
+  "conf": "60",
+  "guarded": false,
+  "hits": {
+   "attr": [
+    "tests/memory_fixture.py"
+   ],
+   "dotted": [],
+   "str": [],
+   "call": []
+  },
+  "total": 1,
+  "class": "dead-attr"
+ },
+ {
+  "file": "src/z0int/intelligence_service.py",
+  "line": "115",
+  "kind": "unused variable",
+  "name": "request_queue_size",
+  "conf": "60",
+  "guarded": false,
+  "hits": {
+   "attr": [],
+   "dotted": [],
+   "str": [],
+   "call": []
+  },
+  "total": 0,
+  "class": "dead-attr"
+ },
+ {
+  "file": "src/z0int/memory/sources.py",
+  "line": "222",
+  "kind": "unused function",
+  "name": "is_pi_session",
+  "conf": "60",
+  "guarded": false,
+  "hits": {
+   "attr": [],
+   "dotted": [],
+   "str": [],
+   "call": []
+  },
+  "total": 0,
+  "class": "dead-func"
+ },
+ {
+  "file": "src/z0int/memory_contract.py",
+  "line": "157",
+  "kind": "unused method",
+  "name": "same_source_event",
+  "conf": "60",
+  "guarded": false,
+  "hits": {
+   "attr": [],
+   "dotted": [],
+   "str": [],
+   "call": []
+  },
+  "total": 0,
+  "class": "fieldish-func"
+ },
+ {
+  "file": "src/z0int/memory_contract.py",
+  "line": "238",
+  "kind": "unused variable",
+  "name": "valid_from",
+  "conf": "60",
+  "guarded": false,
+  "hits": {
+   "attr": [],
+   "dotted": [],
+   "str": [
+    "tests/test_memory_contract.py"
+   ],
+   "call": []
+  },
+  "total": 1,
+  "class": "field"
+ },
+ {
+  "file": "src/z0int/memory_contract.py",
+  "line": "239",
+  "kind": "unused variable",
+  "name": "valid_to",
+  "conf": "60",
+  "guarded": false,
+  "hits": {
+   "attr": [],
+   "dotted": [],
+   "str": [],
+   "call": []
+  },
+  "total": 0,
+  "class": "field"
+ },
+ {
+  "file": "src/z0int/memory_contract.py",
+  "line": "243",
+  "kind": "unused variable",
+  "name": "origin_trust",
+  "conf": "60",
+  "guarded": false,
+  "hits": {
+   "attr": [],
+   "dotted": [],
+   "str": [
+    "src/z0int/memory/claims.py",
+    "src/z0int/memory/event_log.py",
+    "tests/test_hermes_native_capture.py",
+    "tests/test_memory_claims.py"
+   ],
+   "call": []
+  },
+  "total": 4,
+  "class": "field"
+ },
+ {
+  "file": "src/z0int/memory_contract.py",
+  "line": "245",
+  "kind": "unused variable",
+  "name": "derived_from_untrusted",
+  "conf": "60",
+  "guarded": false,
+  "hits": {
+   "attr": [],
+   "dotted": [],
+   "str": [],
+   "call": []
+  },
+  "total": 0,
+  "class": "field"
+ },
+ {
+  "file": "src/z0int/memory_mcp_backends.py",
+  "line": "73",
+  "kind": "unused method",
+  "name": "makefile",
+  "conf": "60",
+  "guarded": false,
+  "hits": {
+   "attr": [],
+   "dotted": [],
+   "str": [],
+   "call": []
+  },
+  "total": 0,
+  "class": "dead-method"
+ },
+ {
+  "file": "src/z0int/os_context.py",
+  "line": "274",
+  "kind": "unused attribute",
+  "name": "row_factory",
+  "conf": "60",
+  "guarded": false,
+  "hits": {
+   "attr": [
+    "adapters/hermes_z0int/native_capture.py",
+    "src/z0int/autoresearch/queue.py",
+    "src/z0int/cognition/learning.py",
+    "tests/test_learning_families.py",
+    "tests/test_learning_search.py"
+   ],
+   "dotted": [],
+   "str": [],
+   "call": []
+  },
+  "total": 5,
+  "class": "field"
+ },
+ {
+  "file": "src/z0int/receipt.py",
+  "line": "103",
+  "kind": "unused variable",
+  "name": "test_pass",
+  "conf": "60",
+  "guarded": false,
+  "hits": {
+   "attr": [],
+   "dotted": [],
+   "str": [
+    "src/z0int/cli.py",
+    "tests/test_legacy_import.py",
+    "tests/test_loop_tick.py",
+    "tests/test_receipt.py"
+   ],
+   "call": []
+  },
+  "total": 4,
+  "class": "field"
+ },
+ {
+  "file": "src/z0int/receipt.py",
+  "line": "105",
+  "kind": "unused variable",
+  "name": "user_correction",
+  "conf": "60",
+  "guarded": false,
+  "hits": {
+   "attr": [],
+   "dotted": [],
+   "str": [
+    "src/z0int/ao_report.py",
+    "src/z0int/cli.py",
+    "src/z0int/outcome_verifier.py",
+    "tests/test_legacy_import.py",
+    "tests/test_loop_tick.py",
+    "tests/test_outcome_verifier.py",
+    "tests/test_turn_readers.py"
+   ],
+   "call": []
+  },
+  "total": 7,
+  "class": "field"
+ },
+ {
+  "file": "src/z0int/receipt.py",
+  "line": "106",
+  "kind": "unused variable",
+  "name": "reverted",
+  "conf": "60",
+  "guarded": false,
+  "hits": {
+   "attr": [],
+   "dotted": [],
+   "str": [
+    "src/z0int/ao_report.py",
+    "src/z0int/cli.py",
+    "tests/test_legacy_import.py"
+   ],
+   "call": []
+  },
+  "total": 3,
+  "class": "field"
+ },
+ {
+  "file": "src/z0int/receipt.py",
+  "line": "107",
+  "kind": "unused variable",
+  "name": "verifier_ok",
+  "conf": "60",
+  "guarded": false,
+  "hits": {
+   "attr": [],
+   "dotted": [],
+   "str": [
+    "results/decision-backends/20260930-mbp-dcv1/tokenomics-events.jsonl",
+    "results/decision-backends/20260930-mbp-tfs-sealed77/tokenomics-events.jsonl",
+    "src/z0int/cli.py"
+   ],
+   "call": []
+  },
+  "total": 3,
+  "class": "field"
+ },
+ {
+  "file": "src/z0int/receipt.py",
+  "line": "108",
+  "kind": "unused variable",
+  "name": "ci_failed",
+  "conf": "60",
+  "guarded": false,
+  "hits": {
+   "attr": [],
+   "dotted": [],
+   "str": [
+    "src/z0int/cli.py",
+    "tests/test_ao_bridge.py",
+    "tests/test_ao_report.py"
+   ],
+   "call": []
+  },
+  "total": 3,
+  "class": "field"
+ },
+ {
+  "file": "src/z0int/receipt.py",
+  "line": "109",
+  "kind": "unused variable",
+  "name": "pr_merged",
+  "conf": "60",
+  "guarded": false,
+  "hits": {
+   "attr": [],
+   "dotted": [],
+   "str": [
+    "src/z0int/cli.py",
+    "src/z0int/outcome_verifier.py",
+    "tests/test_ao_bridge.py",
+    "tests/test_ao_report.py",
+    "tests/test_turn_readers.py"
+   ],
+   "call": []
+  },
+  "total": 5,
+  "class": "field"
+ },
+ {
+  "file": "src/z0int/remote_executor.py",
+  "line": "71",
+  "kind": "unused variable",
+  "name": "daemon_threads",
+  "conf": "60",
+  "guarded": false,
+  "hits": {
+   "attr": [
+    "tests/memory_fixture.py"
+   ],
+   "dotted": [],
+   "str": [],
+   "call": []
+  },
+  "total": 1,
+  "class": "dead-attr"
+ },
+ {
+  "file": "src/z0int/remote_executor.py",
+  "line": "72",
+  "kind": "unused variable",
+  "name": "request_queue_size",
+  "conf": "60",
+  "guarded": false,
+  "hits": {
+   "attr": [],
+   "dotted": [],
+   "str": [],
+   "call": []
+  },
+  "total": 0,
+  "class": "dead-attr"
+ },
+ {
+  "file": "src/z0int/routines.py",
+  "line": "127",
+  "kind": "unused variable",
+  "name": "n_rows",
+  "conf": "60",
+  "guarded": true,
+  "hits": {
+   "attr": [],
+   "dotted": [],
+   "str": [
+    "src/z0int/refinement.py"
+   ],
+   "call": []
+  },
+  "total": 1,
+  "class": "field"
+ },
+ {
+  "file": "src/z0int/routines.py",
+  "line": "135",
+  "kind": "unused variable",
+  "name": "global_prior_precision",
+  "conf": "60",
+  "guarded": false,
+  "hits": {
+   "attr": [],
+   "dotted": [],
+   "str": [],
+   "call": []
+  },
+  "total": 0,
+  "class": "field"
+ },
+ {
+  "file": "src/z0int/routines.py",
+  "line": "138",
+  "kind": "unused variable",
+  "name": "lift_passes_2sigma",
+  "conf": "60",
+  "guarded": false,
+  "hits": {
+   "attr": [],
+   "dotted": [],
+   "str": [],
+   "call": []
+  },
+  "total": 0,
+  "class": "field"
+ },
+ {
+  "file": "src/z0int/state_packet.py",
+  "line": "182",
+  "kind": "unused variable",
+  "name": "source_revision",
+  "conf": "60",
+  "guarded": false,
+  "hits": {
+   "attr": [],
+   "dotted": [],
+   "str": [
+    "benchmarks/build_wanli.py",
+    "src/z0int/cognition/learning.py",
+    "src/z0int/cognition/shadow.py",
+    "src/z0int/memory/claims.py"
+   ],
+   "call": []
+  },
+  "total": 4,
+  "class": "field"
+ },
+ {
+  "file": "src/z0int/state_packet.py",
+  "line": "244",
+  "kind": "unused attribute",
+  "name": "source_revision",
+  "conf": "60",
+  "guarded": false,
+  "hits": {
+   "attr": [],
+   "dotted": [],
+   "str": [
+    "benchmarks/build_wanli.py",
+    "src/z0int/cognition/learning.py",
+    "src/z0int/cognition/shadow.py",
+    "src/z0int/memory/claims.py"
+   ],
+   "call": []
+  },
+  "total": 4,
+  "class": "field"
+ },
+ {
+  "file": "src/z0int/state_packet.py",
+  "line": "493",
+  "kind": "unused attribute",
+  "name": "source_revision",
+  "conf": "60",
+  "guarded": false,
+  "hits": {
+   "attr": [],
+   "dotted": [],
+   "str": [
+    "benchmarks/build_wanli.py",
+    "src/z0int/cognition/learning.py",
+    "src/z0int/cognition/shadow.py",
+    "src/z0int/memory/claims.py"
+   ],
+   "call": []
+  },
+  "total": 4,
+  "class": "field"
+ },
+ {
+  "file": "src/z0int/state_packet.py",
+  "line": "562",
+  "kind": "unused attribute",
+  "name": "source_revision",
+  "conf": "60",
+  "guarded": false,
+  "hits": {
+   "attr": [],
+   "dotted": [],
+   "str": [
+    "benchmarks/build_wanli.py",
+    "src/z0int/cognition/learning.py",
+    "src/z0int/cognition/shadow.py",
+    "src/z0int/memory/claims.py"
+   ],
+   "call": []
+  },
+  "total": 4,
+  "class": "field"
+ },
+ {
+  "file": "src/z0int/state_packet.py",
+  "line": "805",
+  "kind": "unused attribute",
+  "name": "source_revision",
+  "conf": "60",
+  "guarded": false,
+  "hits": {
+   "attr": [],
+   "dotted": [],
+   "str": [
+    "benchmarks/build_wanli.py",
+    "src/z0int/cognition/learning.py",
+    "src/z0int/cognition/shadow.py",
+    "src/z0int/memory/claims.py"
+   ],
+   "call": []
+  },
+  "total": 4,
+  "class": "field"
+ },
+ {
+  "file": "src/z0int/state_packet.py",
+  "line": "898",
+  "kind": "unused attribute",
+  "name": "source_revision",
+  "conf": "60",
+  "guarded": false,
+  "hits": {
+   "attr": [],
+   "dotted": [],
+   "str": [
+    "benchmarks/build_wanli.py",
+    "src/z0int/cognition/learning.py",
+    "src/z0int/cognition/shadow.py",
+    "src/z0int/memory/claims.py"
+   ],
+   "call": []
+  },
+  "total": 4,
+  "class": "field"
+ },
+ {
+  "file": "src/z0int/task_loop.py",
+  "line": "91",
+  "kind": "unused variable",
+  "name": "authorized_at",
+  "conf": "60",
+  "guarded": true,
+  "hits": {
+   "attr": [],
+   "dotted": [],
+   "str": [],
+   "call": []
+  },
+  "total": 0,
+  "class": "field"
+ },
+ {
+  "file": "src/z0int/task_loop.py",
+  "line": "92",
+  "kind": "unused variable",
+  "name": "updated_at",
+  "conf": "60",
+  "guarded": false,
+  "hits": {
+   "attr": [],
+   "dotted": [],
+   "str": [
+    "src/z0int/memory/surface.py",
+    "src/z0int/onboard.py",
+    "tests/memory_fixture.py",
+    "tests/test_memory_surface.py"
+   ],
+   "call": []
+  },
+  "total": 4,
+  "class": "field"
+ },
+ {
+  "file": "src/z0int/task_loop.py",
+  "line": "99",
+  "kind": "unused variable",
+  "name": "context_packet_path",
+  "conf": "60",
+  "guarded": false,
+  "hits": {
+   "attr": [],
+   "dotted": [],
+   "str": [],
+   "call": []
+  },
+  "total": 0,
+  "class": "field"
+ },
+ {
+  "file": "src/z0int/task_loop.py",
+  "line": "101",
+  "kind": "unused variable",
+  "name": "aodl_source_hash",
+  "conf": "60",
+  "guarded": false,
+  "hits": {
+   "attr": [],
+   "dotted": [],
+   "str": [],
+   "call": []
+  },
+  "total": 0,
+  "class": "field"
+ },
+ {
+  "file": "src/z0int/task_loop.py",
+  "line": "102",
+  "kind": "unused variable",
+  "name": "verifier_kind",
+  "conf": "60",
+  "guarded": false,
+  "hits": {
+   "attr": [],
+   "dotted": [],
+   "str": [],
+   "call": []
+  },
+  "total": 0,
+  "class": "field"
+ },
+ {
+  "file": "src/z0int/task_loop.py",
+  "line": "137",
+  "kind": "unused attribute",
+  "name": "updated_at",
+  "conf": "60",
+  "guarded": false,
+  "hits": {
+   "attr": [],
+   "dotted": [],
+   "str": [
+    "src/z0int/memory/surface.py",
+    "src/z0int/onboard.py",
+    "tests/memory_fixture.py",
+    "tests/test_memory_surface.py"
+   ],
+   "call": []
+  },
+  "total": 4,
+  "class": "field"
+ },
+ {
+  "file": "src/z0int/task_loop.py",
+  "line": "298",
+  "kind": "unused attribute",
+  "name": "context_packet_path",
+  "conf": "60",
+  "guarded": false,
+  "hits": {
+   "attr": [],
+   "dotted": [],
+   "str": [],
+   "call": []
+  },
+  "total": 0,
+  "class": "field"
+ },
+ {
+  "file": "src/z0int/task_loop.py",
+  "line": "300",
+  "kind": "unused attribute",
+  "name": "aodl_source_hash",
+  "conf": "60",
+  "guarded": false,
+  "hits": {
+   "attr": [],
+   "dotted": [],
+   "str": [],
+   "call": []
+  },
+  "total": 0,
+  "class": "field"
+ },
+ {
+  "file": "src/z0int/tokenomics_emit.py",
+  "line": "95",
+  "kind": "unused function",
+  "name": "measurement_gaps",
+  "conf": "60",
+  "guarded": false,
+  "hits": {
+   "attr": [],
+   "dotted": [],
+   "str": [
+    "results/decision-backends/20260930-mbp-dcv1.stdout.json",
+    "results/decision-backends/20260930-mbp-dcv1/coverage.json",
+    "results/decision-backends/20260930-mbp-dcv1/summary.json",
+    "results/decision-backends/20260930-mbp-tfs-sealed77.stdout.json",
+    "results/decision-backends/20260930-mbp-tfs-sealed77/coverage.json",
+    "results/decision-backends/20260930-mbp-tfs-sealed77/summary.json"
+   ],
+   "call": []
+  },
+  "total": 6,
+  "class": "dead-func"
+ },
+ {
+  "file": "src/z0int/turn_readers.py",
+  "line": "56",
+  "kind": "unused variable",
+  "name": "TEST_LABEL_POLARITIES",
+  "conf": "60",
+  "guarded": false,
+  "hits": {
+   "attr": [],
+   "dotted": [],
+   "str": [],
+   "call": []
+  },
+  "total": 0,
+  "class": "dead-var"
+ },
+ {
+  "file": "src/z0int/utilization.py",
+  "line": "462",
+  "kind": "unused variable",
+  "name": "api_calls",
+  "conf": "60",
+  "guarded": false,
+  "hits": {
+   "attr": [],
+   "dotted": [],
+   "str": [],
+   "call": []
+  },
+  "total": 0,
+  "class": "dead-attr"
+ },
+ {
+  "file": "src/z0int/verification_density.py",
+  "line": "50",
+  "kind": "unused variable",
+  "name": "TURN_TYPES",
+  "conf": "60",
+  "guarded": false,
+  "hits": {
+   "attr": [],
+   "dotted": [],
+   "str": [],
+   "call": []
+  },
+  "total": 0,
+  "class": "dead-var"
+ },
+ {
+  "file": "src/z0int/worker_routing.py",
+  "line": "176",
+  "kind": "unused function",
+  "name": "oauth_module",
+  "conf": "60",
+  "guarded": false,
+  "hits": {
+   "attr": [],
+   "dotted": [],
+   "str": [],
+   "call": []
+  },
+  "total": 0,
+  "class": "dead-func"
+ }
+]

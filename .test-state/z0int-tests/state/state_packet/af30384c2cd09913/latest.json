@@ -1,0 +1,563 @@
+{
+ "schema": "z0int.state_packet.v0",
+ "packet_id": "da6efb9fe093c6687ef6",
+ "built_at": "2026-11-07T22:54:05Z",
+ "intent": {
+  "name": "resume",
+  "required": [
+   "git.head",
+   "git.branch",
+   "git.dirty",
+   "conv.latest_session"
+  ]
+ },
+ "scope": {
+  "repo": "/workspace/hermes-home/profiles/ayo/cache/scratch/pytest-of-kvn/pytest-0/test_real_packet_builder_end_t0/r",
+  "repo_name": "r"
+ },
+ "decision": {
+  "mode": "OBSERVE",
+  "missing": [
+   "conv.latest_session"
+  ],
+  "reason": "required fact(s) missing/contested: conv.latest_session"
+ },
+ "current_claims": [
+  {
+   "id": "c:ad67601a79",
+   "key": "git.branch",
+   "value": "main",
+   "status": "observed",
+   "evidence": [
+    "e:c960abfa20"
+   ],
+   "observed_at": "2026-11-07T22:54:05Z",
+   "material": true
+  },
+  {
+   "id": "c:3dda783d15",
+   "key": "git.head",
+   "value": {
+    "sha": "1133577",
+    "date": "2026-11-07T16:54:05-06:00",
+    "subject": "i"
+   },
+   "status": "observed",
+   "evidence": [
+    "e:bf278a8a61"
+   ],
+   "observed_at": "2026-11-07T22:54:05Z",
+   "material": true
+  },
+  {
+   "id": "c:91d0fe9164",
+   "key": "git.recent_commits",
+   "value": [
+    {
+     "sha": "1133577",
+     "date": "2026-11-07T16:54:05-06:00",
+     "subject": "i"
+    }
+   ],
+   "status": "observed",
+   "evidence": [
+    "e:b7f1e83795"
+   ],
+   "observed_at": "2026-11-07T22:54:05Z",
+   "material": false
+  },
+  {
+   "id": "c:41f4d135db",
+   "key": "git.default_branch",
+   "value": "main",
+   "status": "observed",
+   "evidence": [
+    "e:88a25a7918"
+   ],
+   "observed_at": "2026-11-07T22:54:05Z",
+   "material": true
+  },
+  {
+   "id": "c:fbcf5b7e9e",
+   "key": "git.dirty",
+   "value": {
+    "clean": true,
+    "modified": [],
+    "untracked": [],
+    "modified_count": 0,
+    "untracked_count": 0
+   },
+   "status": "observed",
+   "evidence": [
+    "e:672193f4c8"
+   ],
+   "observed_at": "2026-11-07T22:54:05Z",
+   "material": true
+  },
+  {
+   "id": "c:f210fd59b7",
+   "key": "git.branches_ahead",
+   "value": {
+    "vs": "main",
+    "complete": true,
+    "local_branches": 1,
+    "ahead": []
+   },
+   "status": "observed",
+   "evidence": [
+    "e:550e818507"
+   ],
+   "observed_at": "2026-11-07T22:54:05Z",
+   "material": true
+  },
+  {
+   "id": "c:ab31bdd69a",
+   "key": "docs.last_commit[README.md]",
+   "value": {
+    "sha": "1133577",
+    "date": "2026-11-07T16:54:05-06:00"
+   },
+   "status": "observed",
+   "evidence": [
+    "e:e2b64feb35"
+   ],
+   "observed_at": "2026-11-07T22:54:05Z",
+   "material": false
+  },
+  {
+   "id": "c:600e42df13",
+   "key": "resource.posture",
+   "value": {
+    "factory": "BALANCED",
+    "action": "frontier on pace",
+    "prefer": [
+     "claude",
+     "codex",
+     "cursor",
+     "grok"
+    ],
+    "avoid": [],
+    "offload_targets": [
+     "route:groq",
+     "kerdoios:cerebras",
+     "kerdoios:local",
+     "route:openrouter",
+     "kerdoios:cohere",
+     "kerdoios:dots-studio"
+    ],
+    "earliest_reset": null,
+    "groups": {
+     "claude": "BALANCED",
+     "codex": "BALANCED",
+     "cursor": "BALANCED",
+     "grok": "BALANCED",
+     "openrouter": "BALANCED"
+    },
+    "enforce": false,
+    "line": "BALANCED (claude=BALANCED, codex=BALANCED, cursor=BALANCED, grok=BALANCED, openrouter=BALANCED) — frontier on pace"
+   },
+   "status": "observed",
+   "evidence": [
+    "e:1f45850cfe"
+   ],
+   "observed_at": "2026-11-07T22:54:05Z",
+   "material": false
+  },
+  {
+   "id": "c:ca912bb139",
+   "key": "resource.posture[claude]",
+   "value": {
+    "posture": "BALANCED",
+    "binding_pool": "claude:weekly",
+    "arithmetic": "observation predates reset at 2026-10-22T08:00:00Z; current remaining unknown",
+    "resets_at": "2026-10-22T08:00:00Z"
+   },
+   "status": "observed",
+   "evidence": [
+    "e:1f45850cfe"
+   ],
+   "observed_at": "2026-11-07T22:54:05Z",
+   "material": false
+  },
+  {
+   "id": "c:e0040c1944",
+   "key": "resource.posture[codex]",
+   "value": {
+    "posture": "BALANCED",
+    "binding_pool": "codex:weekly",
+    "arithmetic": "observation predates reset at 2026-11-05T02:36:47Z; current remaining unknown",
+    "resets_at": "2026-11-05T02:36:47Z"
+   },
+   "status": "observed",
+   "evidence": [
+    "e:1f45850cfe"
+   ],
+   "observed_at": "2026-11-07T22:54:05Z",
+   "material": false
+  },
+  {
+   "id": "c:e2c41d0a27",
+   "key": "resource.posture[cursor]",
+   "value": {
+    "posture": "BALANCED",
+    "binding_pool": "cursor:30d",
+    "arithmetic": "observation predates reset at 2026-10-09T15:49:40Z; current remaining unknown",
+    "resets_at": "2026-10-09T15:49:40Z"
+   },
+   "status": "observed",
+   "evidence": [
+    "e:1f45850cfe"
+   ],
+   "observed_at": "2026-11-07T22:54:05Z",
+   "material": false
+  },
+  {
+   "id": "c:41c49d9e22",
+   "key": "resource.posture[grok]",
+   "value": {
+    "posture": "BALANCED",
+    "binding_pool": "grok:primary",
+    "arithmetic": "observation predates reset at 2026-10-03T02:57:16Z; current remaining unknown",
+    "resets_at": "2026-10-03T02:57:16Z"
+   },
+   "status": "observed",
+   "evidence": [
+    "e:1f45850cfe"
+   ],
+   "observed_at": "2026-11-07T22:54:05Z",
+   "material": false
+  },
+  {
+   "id": "c:2bc67edbdf",
+   "key": "resource.posture[openrouter]",
+   "value": {
+    "posture": "BALANCED",
+    "binding_pool": "openrouter:credits",
+    "arithmetic": "remaining 49.3%; no burn-rate observation",
+    "resets_at": null
+   },
+   "status": "observed",
+   "evidence": [
+    "e:1f45850cfe"
+   ],
+   "observed_at": "2026-11-07T22:54:05Z",
+   "material": false
+  }
+ ],
+ "evidence": {
+  "e:c960abfa20": {
+   "source_id": "git:r",
+   "source_version": "11335776747f",
+   "locator": "/workspace/hermes-home/profiles/ayo/cache/scratch/pytest-of-kvn/pytest-0/test_real_packet_builder_end_t0/r:git branch --show-current",
+   "trust_class": "code",
+   "observed_at": "2026-11-07T22:54:05Z"
+  },
+  "e:bf278a8a61": {
+   "source_id": "git:r",
+   "source_version": "11335776747f",
+   "locator": "/workspace/hermes-home/profiles/ayo/cache/scratch/pytest-of-kvn/pytest-0/test_real_packet_builder_end_t0/r:git log -1 1133577",
+   "trust_class": "code",
+   "observed_at": "2026-11-07T22:54:05Z"
+  },
+  "e:b7f1e83795": {
+   "source_id": "git:r",
+   "source_version": "11335776747f",
+   "locator": "/workspace/hermes-home/profiles/ayo/cache/scratch/pytest-of-kvn/pytest-0/test_real_packet_builder_end_t0/r:git log -n 8",
+   "trust_class": "code",
+   "observed_at": "2026-11-07T22:54:05Z"
+  },
+  "e:88a25a7918": {
+   "source_id": "git:r",
+   "source_version": "11335776747f",
+   "locator": "/workspace/hermes-home/profiles/ayo/cache/scratch/pytest-of-kvn/pytest-0/test_real_packet_builder_end_t0/r:refs/remotes/origin/HEAD",
+   "trust_class": "code",
+   "observed_at": "2026-11-07T22:54:05Z"
+  },
+  "e:672193f4c8": {
+   "source_id": "git:r",
+   "source_version": "11335776747f+ste3b0c44298fc",
+   "locator": "/workspace/hermes-home/profiles/ayo/cache/scratch/pytest-of-kvn/pytest-0/test_real_packet_builder_end_t0/r:git status --porcelain",
+   "trust_class": "code",
+   "observed_at": "2026-11-07T22:54:05Z"
+  },
+  "e:550e818507": {
+   "source_id": "git:r",
+   "source_version": "11335776747f",
+   "locator": "/workspace/hermes-home/profiles/ayo/cache/scratch/pytest-of-kvn/pytest-0/test_real_packet_builder_end_t0/r:git for-each-ref refs/heads",
+   "trust_class": "code",
+   "observed_at": "2026-11-07T22:54:05Z"
+  },
+  "e:e2b64feb35": {
+   "source_id": "doc:r/README.md",
+   "source_version": "sha256:054df7e3c2b0",
+   "locator": "README.md:L1",
+   "trust_class": "project_constraint",
+   "observed_at": "2026-11-07T22:54:05Z"
+  },
+  "e:1f45850cfe": {
+   "source_id": "posture:codexbar+kerdoios+worker_routing",
+   "source_version": "880444bc77ff",
+   "locator": "/home/kvn/.cache/codexbar-waybar/last.json",
+   "trust_class": "derived_memory",
+   "observed_at": "2026-11-07T22:54:05Z",
+   "note": "derived from usage snapshots up to 1120.2h old; re-run `z0int posture`"
+  }
+ },
+ "contradictions": [],
+ "blocking_unknowns": [
+  {
+   "key": "conv.latest_session",
+   "reason": "Claude Code history is unavailable on this host (no readable transcripts); session facts are UNKNOWN - abstain on questions that depend on them",
+   "required_by": "resume",
+   "source_status": "source_unavailable"
+  }
+ ],
+ "unknowns": [
+  {
+   "key": "docs.priority",
+   "reason": "no P0 heading found in ROADMAP/README/AGENTS"
+  }
+ ],
+ "open_work": [],
+ "superseded_claims": [],
+ "allowed_transitions": [
+  {
+   "kind": "OBSERVE",
+   "action": "refresh_packet",
+   "why": "always legal; re-reads changed sources only",
+   "authorizes": false
+  },
+  {
+   "kind": "OBSERVE",
+   "action": "resolve_unknown:conv.latest_session",
+   "why": "Claude Code history is unavailable on this host (no readable transcripts); session facts are UNKNOWN - abstain on questions that depend on them",
+   "authorizes": false
+  }
+ ],
+ "source_revisions": {
+  "git": {
+   "head": "11335776747fab51d7fcac2226ca6d70f1a5b619",
+   "status": "e3b0c44298fc",
+   "refs": "519e5b43d56c"
+  },
+  "docs": {
+   "README.md": "sha256:054df7e3c2b0"
+  },
+  "claude_code": {},
+  "resource": {
+   "posture": "880444bc77ff",
+   "factory": "BALANCED"
+  }
+ },
+ "memory_snapshot_id": "mem_5cb886bc4ed93178406ee09927deaced",
+ "policy_revision": "sp-v0.2",
+ "coverage": {
+  "git": "full",
+  "docs": "full",
+  "claude_code": "none",
+  "resource": "full"
+ },
+ "freshness": {},
+ "claims_index": {
+  "git.branch": {
+   "id": "c:ad67601a79",
+   "value": "main",
+   "observed_at": "2026-11-07T22:54:05Z",
+   "material": true
+  },
+  "git.head": {
+   "id": "c:3dda783d15",
+   "value": {
+    "sha": "1133577",
+    "date": "2026-11-07T16:54:05-06:00",
+    "subject": "i"
+   },
+   "observed_at": "2026-11-07T22:54:05Z",
+   "material": true
+  },
+  "git.recent_commits": {
+   "id": "c:91d0fe9164",
+   "value": [
+    {
+     "sha": "1133577",
+     "date": "2026-11-07T16:54:05-06:00",
+     "subject": "i"
+    }
+   ],
+   "observed_at": "2026-11-07T22:54:05Z",
+   "material": false
+  },
+  "git.default_branch": {
+   "id": "c:41f4d135db",
+   "value": "main",
+   "observed_at": "2026-11-07T22:54:05Z",
+   "material": true
+  },
+  "git.dirty": {
+   "id": "c:fbcf5b7e9e",
+   "value": {
+    "clean": true,
+    "modified": [],
+    "untracked": [],
+    "modified_count": 0,
+    "untracked_count": 0
+   },
+   "observed_at": "2026-11-07T22:54:05Z",
+   "material": true
+  },
+  "git.branches_ahead": {
+   "id": "c:f210fd59b7",
+   "value": {
+    "vs": "main",
+    "complete": true,
+    "local_branches": 1,
+    "ahead": []
+   },
+   "observed_at": "2026-11-07T22:54:05Z",
+   "material": true
+  },
+  "docs.last_commit[README.md]": {
+   "id": "c:ab31bdd69a",
+   "value": {
+    "sha": "1133577",
+    "date": "2026-11-07T16:54:05-06:00"
+   },
+   "observed_at": "2026-11-07T22:54:05Z",
+   "material": false
+  },
+  "resource.posture": {
+   "id": "c:600e42df13",
+   "value": {
+    "factory": "BALANCED",
+    "action": "frontier on pace",
+    "prefer": [
+     "claude",
+     "codex",
+     "cursor",
+     "grok"
+    ],
+    "avoid": [],
+    "offload_targets": [
+     "route:groq",
+     "kerdoios:cerebras",
+     "kerdoios:local",
+     "route:openrouter",
+     "kerdoios:cohere",
+     "kerdoios:dots-studio"
+    ],
+    "earliest_reset": null,
+    "groups": {
+     "claude": "BALANCED",
+     "codex": "BALANCED",
+     "cursor": "BALANCED",
+     "grok": "BALANCED",
+     "openrouter": "BALANCED"
+    },
+    "enforce": false,
+    "line": "BALANCED (claude=BALANCED, codex=BALANCED, cursor=BALANCED, grok=BALANCED, openrouter=BALANCED) — frontier on pace"
+   },
+   "observed_at": "2026-11-07T22:54:05Z",
+   "material": false
+  },
+  "resource.posture[claude]": {
+   "id": "c:ca912bb139",
+   "value": {
+    "posture": "BALANCED",
+    "binding_pool": "claude:weekly",
+    "arithmetic": "observation predates reset at 2026-10-22T08:00:00Z; current remaining unknown",
+    "resets_at": "2026-10-22T08:00:00Z"
+   },
+   "observed_at": "2026-11-07T22:54:05Z",
+   "material": false
+  },
+  "resource.posture[codex]": {
+   "id": "c:e0040c1944",
+   "value": {
+    "posture": "BALANCED",
+    "binding_pool": "codex:weekly",
+    "arithmetic": "observation predates reset at 2026-11-05T02:36:47Z; current remaining unknown",
+    "resets_at": "2026-11-05T02:36:47Z"
+   },
+   "observed_at": "2026-11-07T22:54:05Z",
+   "material": false
+  },
+  "resource.posture[cursor]": {
+   "id": "c:e2c41d0a27",
+   "value": {
+    "posture": "BALANCED",
+    "binding_pool": "cursor:30d",
+    "arithmetic": "observation predates reset at 2026-10-09T15:49:40Z; current remaining unknown",
+    "resets_at": "2026-10-09T15:49:40Z"
+   },
+   "observed_at": "2026-11-07T22:54:05Z",
+   "material": false
+  },
+  "resource.posture[grok]": {
+   "id": "c:41c49d9e22",
+   "value": {
+    "posture": "BALANCED",
+    "binding_pool": "grok:primary",
+    "arithmetic": "observation predates reset at 2026-10-03T02:57:16Z; current remaining unknown",
+    "resets_at": "2026-10-03T02:57:16Z"
+   },
+   "observed_at": "2026-11-07T22:54:05Z",
+   "material": false
+  },
+  "resource.posture[openrouter]": {
+   "id": "c:2bc67edbdf",
+   "value": {
+    "posture": "BALANCED",
+    "binding_pool": "openrouter:credits",
+    "arithmetic": "remaining 49.3%; no burn-rate observation",
+    "resets_at": null
+   },
+   "observed_at": "2026-11-07T22:54:05Z",
+   "material": false
+  }
+ },
+ "cache": {
+  "key": "da6efb9fe093c6687ef6",
+  "prior_packet_id": null
+ },
+ "privacy": {
+  "local_only": true,
+  "excerpt_max_chars": 160,
+  "note": "conversation content limited to redacted short excerpts/titles"
+ },
+ "measurements": {
+  "cache_hit": false,
+  "wall_ms": 51.93,
+  "adapters": {
+   "git": {
+    "wall_ms": 36.33,
+    "reads": 12,
+    "bytes_read": 339,
+    "claims": 6
+   },
+   "docs": {
+    "wall_ms": 6.33,
+    "reads": 2,
+    "bytes_read": 50,
+    "claims": 1
+   },
+   "claude_code": {
+    "wall_ms": 2.74,
+    "reads": 0,
+    "bytes_read": 0,
+    "claims": 0
+   },
+   "resource": {
+    "wall_ms": 3.68,
+    "reads": 0,
+    "bytes_read": 0,
+    "claims": 6
+   }
+  },
+  "raw_source_reads": 18,
+  "bytes_read": 491,
+  "transcript_bytes_read": 0,
+  "packet_bytes": 11614,
+  "concurrent_adapters": 4,
+  "network_calls": 0
+ }
+}
