@@ -67,3 +67,38 @@ def test_cli_writes_result(tmp_path):
     out = tmp_path / "r.json"
     assert cc.main(["--arm", "head-tail", "--out", str(out)]) == 0
     assert json.loads(out.read_text())["exp_id"] == "hz-compaction-carryover"
+
+
+def test_repo_sha_marks_uncommitted_experiment_code(tmp_path, monkeypatch):
+    """#372: a run from a dirty tree must not pass as a run of HEAD."""
+    import subprocess
+    for k in ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE"):
+        monkeypatch.delenv(k, raising=False)
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv("GIT_CONFIG_NOSYSTEM", "1")
+    monkeypatch.setenv("GIT_CONFIG_GLOBAL", "/dev/null")
+    git = lambda *a: subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false",
+                                     *a], cwd=tmp_path, check=True, capture_output=True, text=True).stdout.strip()
+    exp = tmp_path / "experiments" / "x"
+    exp.mkdir(parents=True)
+    (exp / "run.py").write_text("A = 1\n")
+    git("init", "-q")
+    git("add", "-A")
+    git("commit", "-qm", "base")
+    head = git("rev-parse", "HEAD")
+    assert cc.repo_sha(exp) == head
+    (tmp_path / "result.json").write_text("{}")  # the docstring's --out lands in the repo root
+    assert cc.repo_sha(exp) == head
+    (exp / "run.py").write_text("A = 2\n")  # tracked edit that changes the score
+    assert cc.repo_sha(exp) == head + "+dirty"
+    (tmp_path / "src").mkdir()
+    git("checkout", "-q", "--", ".")
+    git("config", "status.showUntrackedFiles", "no")  # a user setting must not hide new files
+    (tmp_path / "src" / "arm.py").write_text("")  # new, uncommitted arm code
+    assert cc.repo_sha(exp) == head + "+dirty"
+    git("add", "-A")
+    git("commit", "-qm", "arm")
+    assert cc.repo_sha(exp) == git("rev-parse", "HEAD")
+    (tmp_path / "outside").mkdir()
+    monkeypatch.setenv("GIT_CEILING_DIRECTORIES", str(tmp_path))
+    assert cc.repo_sha(tmp_path / "outside") == "unknown"  # not in a repo: as before

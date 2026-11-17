@@ -9,8 +9,9 @@ the compacted text and no superseded value of the same key does.
     python3 experiments/hz-compaction-carryover/run.py --arm head-tail --tier public --out result.json
 
 Add a candidate: write `def compactor_<name>(turns, budget) -> str`, register it in
-ARMS as `compactor-<name>`, and run it. Any candidate is scored against the control
-on the same split.
+ARMS as `compactor-<name>`, commit, and run it (uncommitted changes under
+experiments/ or src/ mark repo_sha `+dirty`, and z0 refuses to post it). Any
+candidate is scored against the control on the same split.
 """
 from __future__ import annotations
 
@@ -115,13 +116,20 @@ def bootstrap_ci(xs: list[float], seed: int = SEED, reps: int = 2000) -> list[fl
     return [ms[int(0.025 * reps)], ms[int(0.975 * reps) - 1]]
 
 
+def repo_sha(here: Path) -> str:
+    """HEAD, plus `+dirty` if experiments/ or src/ differ from it (tracked edits or new files)."""
+    git = lambda *a: subprocess.run(["git", *a], cwd=here, capture_output=True, text=True).stdout.strip()
+    sha = git("rev-parse", "HEAD")
+    dirty = sha and git("status", "--porcelain", "--untracked-files=normal", "--", ":/experiments", ":/src")
+    return sha + "+dirty" if dirty else sha or "unknown"
+
+
 def result(arm: str, data: list[dict]) -> dict:
-    here = Path(__file__).resolve().parent
-    sha = subprocess.run(["git", "rev-parse", "HEAD"], cwd=here, capture_output=True, text=True).stdout.strip()
+    sha = repo_sha(Path(__file__).resolve().parent)
     errs = run_arm(arm, data)
     r = {"schema": "z0.exp.result.v1", "exp_id": EXP_ID, "epoch": EPOCH, "arm": arm, "data_tier": "public",
          "data_manifest_sha256": hashlib.sha256(json.dumps(data, sort_keys=True).encode()).hexdigest(),
-         "repo_sha": sha or "unknown", "n": len(data),
+         "repo_sha": sha, "n": len(data),
          "metric": {"name": "carryover_error_rate", "value": round(mean(errs), 6),
                     "ci95": [round(x, 6) for x in bootstrap_ci(errs)]},
          "verdict": "NULL", "command": f"python3 experiments/hz-compaction-carryover/run.py --arm {arm} --tier public",
