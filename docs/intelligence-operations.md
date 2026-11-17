@@ -33,7 +33,7 @@ original paths are recorded in `RUNTIME.json`; no credentials are copied.
 
 `scripts/stage-z0int-release.sh <full-sha> <stamped-runtime-root>` materializes
 committed source in `~/.local/lib/z0int-shadow/<full-sha>`, records `DEPLOYED_SHA`
-and makes source read-only. The source is never a Git checkout. Its `.venv` points
+compiles `src` to bytecode with the release runtime (a sealed tree cannot cache it, so every hook would recompile) and makes source read-only. The source is never a Git checkout. Its `.venv` points
 to the immutable, shared runtime snapshot, not to a worktree environment.
 `Z0INT_RELEASE_SOURCE` selects the source repository without changing its branch.
 
