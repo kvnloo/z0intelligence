@@ -48,3 +48,17 @@ def test_optional_import_does_not_shadow_repository_tests():
  before=list(sys.path)
  project([])
  assert sys.path==before
+
+
+def test_provider_429_counts_a_request_not_its_reservation():
+ # A 429 is refused before inference: one request, zero tokens. Charging the reservation
+ # (~2.2k) for each of 40 groq 429s on 2026-11-16 closed the 200k daily budget hours early.
+ permit={'trace_id':'p','provider':'groq','capability_id':'intelligence.provider_admission','ts':99990,'extra':{'status':'acquired','quota_model':MODEL,'quota_reserved_tokens':7500}}
+ refused={'trace_id':'r','provider':'groq','model':MODEL,'execution':'live','ts':99991,'extra':{'status':'failed','http_status':429,'admission_token':'p','physical_started_at':99990}}
+ r=project([permit,refused])
+ assert r['allowed'] and r['tokens_24h']==0 and r['request_count_24h']==1
+ assert r['quota']['dimensions']['rpm']['remaining']==29
+def test_unmetered_non_429_failure_keeps_reservation():
+ permit={'trace_id':'p','provider':'groq','capability_id':'intelligence.provider_admission','ts':99990,'extra':{'status':'acquired','quota_model':MODEL,'quota_reserved_tokens':7500}}
+ lost={'trace_id':'r','provider':'groq','model':MODEL,'execution':'live','ts':99991,'extra':{'status':'failed','http_status':None,'admission_token':'p','physical_started_at':99990}}
+ assert project([permit,lost])['tokens_24h']==7500
