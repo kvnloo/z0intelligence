@@ -1,0 +1,1591 @@
+........................................................................ [  3%]
+...............................F...FFFF.F............................... [  6%]
+................sssss................................................... [  9%]
+...................................................s.................... [ 12%]
+........................................................................ [ 15%]
+........................................................................ [ 18%]
+........................................................................ [ 21%]
+...............................................FFF.F.F..........F....... [ 25%]
+........................................................................ [ 28%]
+.......FF..F.F..FF.FF......................F...........................s [ 31%]
+s..............................ss...x................................... [ 34%]
+........................................................................ [ 37%]
+...FFFF......F...................................F...................... [ 40%]
+........................................................................ [ 43%]
+..........................................FFFFFFFFFFFFFFF............... [ 46%]
+...................................F....F.....F......................... [ 50%]
+......................F................................................. [ 53%]
+........................................................................ [ 56%]
+........................................................................ [ 59%]
+........................................................................ [ 62%]
+........................................................................ [ 65%]
+.............ss......................................................... [ 68%]
+..................F.......F............................................. [ 71%]
+........................................................................ [ 75%]
+........................................................................ [ 78%]
+........................................................................ [ 81%]
+........................................................................ [ 84%]
+........................................................................ [ 87%]
+........................................................................ [ 90%]
+........................................................................ [ 93%]
+........................................................................ [ 96%]
+..............F......................................................... [100%]
+=================================== FAILURES ===================================
+________________ AodlAdmissionTests.test_real_aodl_contract_api ________________
+
+self = <test_aodl_admission.AodlAdmissionTests testMethod=test_real_aodl_contract_api>
+
+    @unittest.skipUnless(importlib.util.find_spec("aodl_contract"), "aodl-contract not installed")
+    def test_real_aodl_contract_api(self):
+        decision = decide_spawn(document(), request())
+>       self.assertTrue(decision.allowed, decision)
+E       AssertionError: False is not true : AdmissionDecision(allowed=False, codes=('aodl-api-invalid',), numeric_codes=(), source='fail-closed', semantic_fingerprint=None, intent_source_hash=None, contract_revision=None, request_revision=3, parent_node_id='parent', latency_us=7.22, detail='AttributeError')
+
+tests/test_aodl_admission.py:159: AssertionError
+___________ test_drift_projects_stateupdate_without_mutating_intent ____________
+
+    def test_drift_projects_stateupdate_without_mutating_intent():
+        doc = document()
+        before = json.dumps(doc, sort_keys=True)
+>       result = record_drift(doc, trace_id="trace-drift", observation={"worker_status": "failed"})
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_aodl_observation.py:47: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/z0int/aodl_observation.py:174: in record_drift
+    projected = project_drift(
+src/z0int/aodl_observation.py:79: in project_drift
+    api = _api()
+          ^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    def _api():
+        import aodl_contract  # type: ignore
+    
+        if getattr(aodl_contract, "CANON_VERSION", None) != "aodl-canon-1":
+>           raise ValueError("aodl-canon-1 is required")
+E           ValueError: aodl-canon-1 is required
+
+src/z0int/aodl_observation.py:24: ValueError
+____________ test_drift_replay_is_idempotent_for_event_and_receipt _____________
+
+    def test_drift_replay_is_idempotent_for_event_and_receipt():
+>       first = record_drift(document(), trace_id="trace-drift", observation={"worker_status": "failed"})
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_aodl_observation.py:68: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/z0int/aodl_observation.py:174: in record_drift
+    projected = project_drift(
+src/z0int/aodl_observation.py:79: in project_drift
+    api = _api()
+          ^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    def _api():
+        import aodl_contract  # type: ignore
+    
+        if getattr(aodl_contract, "CANON_VERSION", None) != "aodl-canon-1":
+>           raise ValueError("aodl-canon-1 is required")
+E           ValueError: aodl-canon-1 is required
+
+src/z0int/aodl_observation.py:24: ValueError
+____________ test_invalid_contract_fails_before_observation_receipt ____________
+
+    def test_invalid_contract_fails_before_observation_receipt():
+        doc = document()
+        doc["intentGraph"]["nodes"][0]["kind"] = ["task"]
+        with pytest.raises(ValueError, match="invalid AODL"):
+>           record_drift(doc, trace_id="bad", observation={"x": 1})
+
+tests/test_aodl_observation.py:83: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/z0int/aodl_observation.py:174: in record_drift
+    projected = project_drift(
+src/z0int/aodl_observation.py:79: in project_drift
+    api = _api()
+          ^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    def _api():
+        import aodl_contract  # type: ignore
+    
+        if getattr(aodl_contract, "CANON_VERSION", None) != "aodl-canon-1":
+>           raise ValueError("aodl-canon-1 is required")
+E           ValueError: aodl-canon-1 is required
+
+src/z0int/aodl_observation.py:24: ValueError
+
+During handling of the above exception, another exception occurred:
+
+    def test_invalid_contract_fails_before_observation_receipt():
+        doc = document()
+        doc["intentGraph"]["nodes"][0]["kind"] = ["task"]
+>       with pytest.raises(ValueError, match="invalid AODL"):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       AssertionError: Regex pattern did not match.
+E        Regex: 'invalid AODL'
+E        Input: 'aodl-canon-1 is required'
+
+tests/test_aodl_observation.py:82: AssertionError
+_____ test_project_drift_supports_causal_parents_without_reordering_intent _____
+
+    def test_project_drift_supports_causal_parents_without_reordering_intent():
+        doc = document()
+        original_graph = copy.deepcopy(doc["intentGraph"])
+>       result = project_drift(
+            doc,
+            trace_id="child",
+            observation={"state": "stale"},
+            causal_parents=("event-b", "event-a"),
+        )
+
+tests/test_aodl_observation.py:90: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/z0int/aodl_observation.py:79: in project_drift
+    api = _api()
+          ^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    def _api():
+        import aodl_contract  # type: ignore
+    
+        if getattr(aodl_contract, "CANON_VERSION", None) != "aodl-canon-1":
+>           raise ValueError("aodl-canon-1 is required")
+E           ValueError: aodl-canon-1 is required
+
+src/z0int/aodl_observation.py:24: ValueError
+_____________ test_concurrent_drift_records_one_canonical_receipt ______________
+
+    def test_concurrent_drift_records_one_canonical_receipt():
+        from concurrent.futures import ThreadPoolExecutor
+        with ThreadPoolExecutor(max_workers=8) as pool:
+>           rows = list(pool.map(lambda _: record_drift(document(), trace_id='same-drift',
+                                                       observation={'worker_status': 'failed'}), range(24)))
+
+tests/test_aodl_observation.py:144: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/home/kvn/.local/share/uv/python/cpython-3.13.13-linux-x86_64-gnu/lib/python3.13/concurrent/futures/_base.py:619: in result_iterator
+    yield _result_or_cancel(fs.pop())
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/home/kvn/.local/share/uv/python/cpython-3.13.13-linux-x86_64-gnu/lib/python3.13/concurrent/futures/_base.py:317: in _result_or_cancel
+    return fut.result(timeout)
+           ^^^^^^^^^^^^^^^^^^^
+/home/kvn/.local/share/uv/python/cpython-3.13.13-linux-x86_64-gnu/lib/python3.13/concurrent/futures/_base.py:449: in result
+    return self.__get_result()
+           ^^^^^^^^^^^^^^^^^^^
+/home/kvn/.local/share/uv/python/cpython-3.13.13-linux-x86_64-gnu/lib/python3.13/concurrent/futures/_base.py:401: in __get_result
+    raise self._exception
+/home/kvn/.local/share/uv/python/cpython-3.13.13-linux-x86_64-gnu/lib/python3.13/concurrent/futures/thread.py:59: in run
+    result = self.fn(*self.args, **self.kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_aodl_observation.py:144: in <lambda>
+    rows = list(pool.map(lambda _: record_drift(document(), trace_id='same-drift',
+src/z0int/aodl_observation.py:174: in record_drift
+    projected = project_drift(
+src/z0int/aodl_observation.py:79: in project_drift
+    api = _api()
+          ^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    def _api():
+        import aodl_contract  # type: ignore
+    
+        if getattr(aodl_contract, "CANON_VERSION", None) != "aodl-canon-1":
+>           raise ValueError("aodl-canon-1 is required")
+E           ValueError: aodl-canon-1 is required
+
+src/z0int/aodl_observation.py:24: ValueError
+___________ test_protocol_v3_allow_is_fsynced_before_dispatch_start ____________
+
+    def test_protocol_v3_allow_is_fsynced_before_dispatch_start():
+        req=governed();owner=secrets.token_hex(32)
+        claimed=protocol3(req,owner)
+>       assert claimed['claimed']
+E       assert False
+
+tests/test_dispatch_authority.py:212: AssertionError
+__________ test_protocol_v3_projects_gate_latency_once_to_tokenomics ___________
+
+    def test_protocol_v3_projects_gate_latency_once_to_tokenomics():
+        from z0int.tokenomics_emit import events_path
+        req=governed();owner=secrets.token_hex(32)
+        first=protocol3(req,owner)
+>       assert first['claimed']
+E       assert False
+
+tests/test_dispatch_authority.py:228: AssertionError
+____________ test_protocol_v3_denied_budget_never_creates_dispatch _____________
+
+    def test_protocol_v3_denied_budget_never_creates_dispatch():
+        req=governed(doc=aodl_document(tokens=10),observed={'tokens':10},proposed={'tokens':1})
+        owner=secrets.token_hex(32)
+        denied=protocol3(req,owner)
+        assert not denied['claimed']
+>       assert denied['result']['aodl_admission']['numeric_codes']==[105]
+E       assert [] == [105]
+E         
+E         Right contains one more item: 105
+E         Use -v to get more diff
+
+tests/test_dispatch_authority.py:244: AssertionError
+_________ test_restart_reuses_allowed_admission_before_dispatch_start __________
+
+    def test_restart_reuses_allowed_admission_before_dispatch_start():
+        from z0int import aodl_dispatch
+        req=governed();key=a.identity(req)
+        with a.locked(key):
+            admission=aodl_dispatch.ensure(req,key,a.fingerprint(req),required=True)
+>       assert admission is not None and admission['extra']['aodl_admission']['allowed']
+E       AssertionError: assert ({'action_taken': 'dispatch_deny', 'capability_id': 'aodl.structural_admission', 'execution': 'log_only', 'extra': {'ao...ce', 'harness': 'dsh', 'request_sha256': 'a1a83a507e32f3a2c836e3f0bde3b7f41a5dd89c063b6b50c4a75450016c4004', ...}, ...} is not None and False)
+
+tests/test_dispatch_authority.py:269: AssertionError
+_________ test_runtime_semantic_drift_does_not_rewrite_intent_lineage __________
+
+    def test_runtime_semantic_drift_does_not_rewrite_intent_lineage():
+        first=governed(trace='drift-a',doc=aodl_document(plan={'generation':1}))
+        second=governed(trace='drift-b',doc=aodl_document(plan={'generation':2}))
+>       assert protocol3(first,secrets.token_hex(32))['claimed']
+E       assert False
+
+tests/test_dispatch_authority.py:290: AssertionError
+_ FileSearchTests.test_ceiling_conservatively_counts_caches_and_nested_repositories _
+
+self = <test_file_search.FileSearchTests testMethod=test_ceiling_conservatively_counts_caches_and_nested_repositories>
+
+    def test_ceiling_conservatively_counts_caches_and_nested_repositories(self):
+        with repository() as tmp:
+            root = Path(tmp)
+            (root / "source.py").write_text("pass")
+            for name in ("target", "node_modules", ".venv", ".cache", "other"):
+                child = root / name
+                child.mkdir()
+                (child / "generated").write_text("ignored")
+            subprocess.run(["git", "init", "-q", str(root / "other")], check=True)
+>           self.assertEqual(file_search._admit_root(root), 6)
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_file_search.py:205: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+root = PosixPath('/home/kvn/.hermes/profiles/ayo/cache/scratch/tmpqg83cr0a')
+
+    def _admit_root(root: Path) -> int:
+        """Fail before constructing an index or registering any filesystem watch."""
+        forbidden = {Path("/mnt/zer0models"), Path("/mnt/zer0models/workspace/zer0")}
+        if root in forbidden or root == Path(root.anchor):
+            raise ValueError(f"forbidden workspace root: {root}")
+        result = subprocess.run(
+            ["git", "-C", str(root), "rev-parse", "--show-toplevel"],
+            capture_output=True, text=True, timeout=5, check=True,
+            env={k: v for k, v in os.environ.items() if not k.startswith("GIT_")},
+        )
+        if Path(result.stdout.strip()).resolve() != root:
+>           raise ValueError(f"root is not a git toplevel: {root}")
+E           ValueError: root is not a git toplevel: /home/kvn/.hermes/profiles/ayo/cache/scratch/tmpqg83cr0a
+
+src/z0int/file_search.py:47: ValueError
+__________ test_valid_preflight_reaches_live_proof_only_after_checks ___________
+
+tmp_path = PosixPath('/workspace/hermes-home/profiles/ayo/cache/scratch/pytest-of-kvn/pytest-0/test_valid_preflight_reaches_l0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7fccda3d7540>
+
+    def test_valid_preflight_reaches_live_proof_only_after_checks(tmp_path, monkeypatch):
+        omp, evals = fake_roots(tmp_path, "a" * 40)
+        out = tmp_path / "out"
+        monkeypatch.setenv("OPENROUTER_API_KEY", "fixture")
+        monkeypatch.setattr(W.shutil, "which", lambda name: "/fixture/bun" if name == "bun" else None)
+        monkeypatch.setattr(W, "git_clean", lambda path: True)
+        monkeypatch.setattr(W, "git_head", lambda path: "a" * 40 if path == W.ROOT else "b" * 40)
+        monkeypatch.setattr(
+            sys,
+            "argv",
+            ["run-aodl-golden-canary.py", "--omp-root", str(omp), "--z0evals-root", str(evals), "--output", str(out)],
+        )
+    
+        class StopLive(Exception):
+            pass
+    
+        calls = []
+        def stop(cmd, *, cwd, env):
+            calls.append((cmd, cwd))
+            raise StopLive
+    
+        monkeypatch.setattr(W, "run", stop)
+        with pytest.raises(StopLive):
+>           W.main()
+
+tests/test_golden_canary_wrapper.py:113: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+scripts/run-aodl-golden-canary.py:92: in main
+    parser.error("aodl_contract must expose aodl-canon-1")
+/home/kvn/.local/share/uv/python/cpython-3.13.13-linux-x86_64-gnu/lib/python3.13/argparse.py:2686: in error
+    self.exit(2, _('%(prog)s: error: %(message)s\n') % args)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = ArgumentParser(prog='run-aodl-golden-canary.py', usage=None, description='Run the first full AODL governed golden cana...ls root-trace collector.\n', formatter_class=<class 'argparse.HelpFormatter'>, conflict_handler='error', add_help=True)
+status = 2
+message = 'run-aodl-golden-canary.py: error: aodl_contract must expose aodl-canon-1\n'
+
+    def exit(self, status=0, message=None):
+        if message:
+            self._print_message(message, _sys.stderr)
+>       _sys.exit(status)
+E       SystemExit: 2
+
+/home/kvn/.local/share/uv/python/cpython-3.13.13-linux-x86_64-gnu/lib/python3.13/argparse.py:2673: SystemExit
+----------------------------- Captured stderr call -----------------------------
+usage: run-aodl-golden-canary.py [-h] --omp-root OMP_ROOT
+                                 --z0evals-root Z0EVALS_ROOT --output OUTPUT
+run-aodl-golden-canary.py: error: aodl_contract must expose aodl-canon-1
+_______ test_checked_in_contract_is_valid_and_builds_protocol_v3_request _______
+
+    def test_checked_in_contract_is_valid_and_builds_protocol_v3_request():
+>       remote = g.build_remote_request(request())
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_governed_worker.py:40: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/z0int/governed_worker.py:209: in build_remote_request
+    document = load_contract()
+               ^^^^^^^^^^^^^^^
+src/z0int/governed_worker.py:44: in load_contract
+    api = _contract_api()
+          ^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    def _contract_api():
+        import aodl_contract  # type: ignore
+    
+        if getattr(aodl_contract, "CANON_VERSION", None) != "aodl-canon-1":
+>           raise ValueError("aodl-canon-1 is required")
+E           ValueError: aodl-canon-1 is required
+
+src/z0int/governed_worker.py:34: ValueError
+_________ test_explicit_governed_provider_must_have_zero_cost_evidence _________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7fccda1eef20>
+
+    def test_explicit_governed_provider_must_have_zero_cost_evidence(monkeypatch):
+        monkeypatch.setenv("Z0INT_GOVERNED_PROVIDER", "deepseek")
+        with pytest.raises(ValueError, match="zero-cost"):
+>           g.build_remote_request(request())
+
+tests/test_governed_worker.py:79: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/z0int/governed_worker.py:209: in build_remote_request
+    document = load_contract()
+               ^^^^^^^^^^^^^^^
+src/z0int/governed_worker.py:44: in load_contract
+    api = _contract_api()
+          ^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    def _contract_api():
+        import aodl_contract  # type: ignore
+    
+        if getattr(aodl_contract, "CANON_VERSION", None) != "aodl-canon-1":
+>           raise ValueError("aodl-canon-1 is required")
+E           ValueError: aodl-canon-1 is required
+
+src/z0int/governed_worker.py:34: ValueError
+
+During handling of the above exception, another exception occurred:
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7fccda1eef20>
+
+    def test_explicit_governed_provider_must_have_zero_cost_evidence(monkeypatch):
+        monkeypatch.setenv("Z0INT_GOVERNED_PROVIDER", "deepseek")
+>       with pytest.raises(ValueError, match="zero-cost"):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       AssertionError: Regex pattern did not match.
+E        Regex: 'zero-cost'
+E        Input: 'aodl-canon-1 is required'
+
+tests/test_governed_worker.py:78: AssertionError
+_____________ test_unknown_attempted_token_usage_blocks_next_spawn _____________
+
+    def test_unknown_attempted_token_usage_blocks_next_spawn():
+        doc = json.loads(CONTRACT.read_text())
+        source_hash = doc["provenance"]["sourceHash"]
+        append_receipt({
+            "trace_id": "aodl-admission-unknown",
+            "capability_id": "aodl.structural_admission",
+            "extra": {"aodl_admission": {
+                "allowed": True,
+                "aodl_intent_source_hash": source_hash,
+                "parent_node_id": "parent",
+            }},
+        })
+        append_receipt({
+            "trace_id": "dispatch-unknown",
+            "capability_id": "intelligence.dispatch",
+            "extra": {"status": "completed", "aodl_admission_receipt_id": "aodl-admission-unknown"},
+        })
+        append_receipt({
+            "trace_id": "physical-unknown",
+            "provider": "openrouter",
+            "model": "free",
+            "extra": {
+                "status": "completed_unmetered_or_unidentified",
+                "authority_dispatch_id": "dispatch-unknown",
+                "physical_call_attempted": True,
+            },
+        })
+        state = g.observed_spawn_state(doc, "parent")
+        assert state["unknown_token_usage_attempts"] == 1
+        with pytest.raises(ValueError, match="token spend is unknown"):
+>           g.build_remote_request(request(trace_id="next"))
+
+tests/test_governed_worker.py:168: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/z0int/governed_worker.py:209: in build_remote_request
+    document = load_contract()
+               ^^^^^^^^^^^^^^^
+src/z0int/governed_worker.py:44: in load_contract
+    api = _contract_api()
+          ^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    def _contract_api():
+        import aodl_contract  # type: ignore
+    
+        if getattr(aodl_contract, "CANON_VERSION", None) != "aodl-canon-1":
+>           raise ValueError("aodl-canon-1 is required")
+E           ValueError: aodl-canon-1 is required
+
+src/z0int/governed_worker.py:34: ValueError
+
+During handling of the above exception, another exception occurred:
+
+    def test_unknown_attempted_token_usage_blocks_next_spawn():
+        doc = json.loads(CONTRACT.read_text())
+        source_hash = doc["provenance"]["sourceHash"]
+        append_receipt({
+            "trace_id": "aodl-admission-unknown",
+            "capability_id": "aodl.structural_admission",
+            "extra": {"aodl_admission": {
+                "allowed": True,
+                "aodl_intent_source_hash": source_hash,
+                "parent_node_id": "parent",
+            }},
+        })
+        append_receipt({
+            "trace_id": "dispatch-unknown",
+            "capability_id": "intelligence.dispatch",
+            "extra": {"status": "completed", "aodl_admission_receipt_id": "aodl-admission-unknown"},
+        })
+        append_receipt({
+            "trace_id": "physical-unknown",
+            "provider": "openrouter",
+            "model": "free",
+            "extra": {
+                "status": "completed_unmetered_or_unidentified",
+                "authority_dispatch_id": "dispatch-unknown",
+                "physical_call_attempted": True,
+            },
+        })
+        state = g.observed_spawn_state(doc, "parent")
+        assert state["unknown_token_usage_attempts"] == 1
+>       with pytest.raises(ValueError, match="token spend is unknown"):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       AssertionError: Regex pattern did not match.
+E        Regex: 'token spend is unknown'
+E        Input: 'aodl-canon-1 is required'
+
+tests/test_governed_worker.py:167: AssertionError
+_____________ test_prepare_freezes_governance_but_not_task_context _____________
+
+    def test_prepare_freezes_governance_but_not_task_context():
+>       first = g.prepare_remote_request(request())
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_governed_worker.py:221: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/z0int/governed_worker.py:298: in prepare_remote_request
+    remote = build_remote_request(args)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^
+src/z0int/governed_worker.py:209: in build_remote_request
+    document = load_contract()
+               ^^^^^^^^^^^^^^^
+src/z0int/governed_worker.py:44: in load_contract
+    api = _contract_api()
+          ^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    def _contract_api():
+        import aodl_contract  # type: ignore
+    
+        if getattr(aodl_contract, "CANON_VERSION", None) != "aodl-canon-1":
+>           raise ValueError("aodl-canon-1 is required")
+E           ValueError: aodl-canon-1 is required
+
+src/z0int/governed_worker.py:34: ValueError
+__________ test_prepare_same_trace_different_caller_request_conflicts __________
+
+    def test_prepare_same_trace_different_caller_request_conflicts():
+>       g.prepare_remote_request(request())
+
+tests/test_governed_worker.py:254: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/z0int/governed_worker.py:298: in prepare_remote_request
+    remote = build_remote_request(args)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^
+src/z0int/governed_worker.py:209: in build_remote_request
+    document = load_contract()
+               ^^^^^^^^^^^^^^^
+src/z0int/governed_worker.py:44: in load_contract
+    api = _contract_api()
+          ^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    def _contract_api():
+        import aodl_contract  # type: ignore
+    
+        if getattr(aodl_contract, "CANON_VERSION", None) != "aodl-canon-1":
+>           raise ValueError("aodl-canon-1 is required")
+E           ValueError: aodl-canon-1 is required
+
+src/z0int/governed_worker.py:34: ValueError
+___________ test_execute_forwards_same_trace_and_host_built_envelope ___________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7fccda1ee270>
+
+    def test_execute_forwards_same_trace_and_host_built_envelope(monkeypatch):
+        captured = {}
+    
+        class Response:
+            def __enter__(self):
+                return self
+            def __exit__(self, *args):
+                return None
+            def read(self):
+                return b'{"ok":true,"output":"done"}'
+    
+        def fake_urlopen(req, timeout):
+            captured["url"] = req.full_url
+            captured["body"] = json.loads(req.data)
+            captured["timeout"] = timeout
+            return Response()
+    
+        monkeypatch.setenv("Z0INT_REMOTE_EXECUTOR_URL", "http://executor.test:11503")
+        monkeypatch.setattr(g.urllib.request, "urlopen", fake_urlopen)
+>       result = g.execute(request())
+                 ^^^^^^^^^^^^^^^^^^^^
+
+tests/test_governed_worker.py:285: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/z0int/governed_worker.py:328: in execute
+    request = prepare_remote_request(args)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src/z0int/governed_worker.py:298: in prepare_remote_request
+    remote = build_remote_request(args)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^
+src/z0int/governed_worker.py:209: in build_remote_request
+    document = load_contract()
+               ^^^^^^^^^^^^^^^
+src/z0int/governed_worker.py:44: in load_contract
+    api = _contract_api()
+          ^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    def _contract_api():
+        import aodl_contract  # type: ignore
+    
+        if getattr(aodl_contract, "CANON_VERSION", None) != "aodl-canon-1":
+>           raise ValueError("aodl-canon-1 is required")
+E           ValueError: aodl-canon-1 is required
+
+src/z0int/governed_worker.py:34: ValueError
+_________ test_remote_executor_result_carries_root_trace_and_admission _________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7fccda1efd90>
+
+    def test_remote_executor_result_carries_root_trace_and_admission(monkeypatch):
+        import z0int.remote_executor as remote
+    
+>       req = g.build_remote_request(request())
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_governed_worker.py:297: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/z0int/governed_worker.py:209: in build_remote_request
+    document = load_contract()
+               ^^^^^^^^^^^^^^^
+src/z0int/governed_worker.py:44: in load_contract
+    api = _contract_api()
+          ^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    def _contract_api():
+        import aodl_contract  # type: ignore
+    
+        if getattr(aodl_contract, "CANON_VERSION", None) != "aodl-canon-1":
+>           raise ValueError("aodl-canon-1 is required")
+E           ValueError: aodl-canon-1 is required
+
+src/z0int/governed_worker.py:34: ValueError
+_ HermesAdapterTests.test_repository_context_uses_shared_packet_and_event_log __
+
+self = <test_hermes_adapter.HermesAdapterTests testMethod=test_repository_context_uses_shared_packet_and_event_log>
+
+    def test_repository_context_uses_shared_packet_and_event_log(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "repo"
+            root.mkdir()
+            (root / "README.md").write_text("hermes evidence\n", encoding="utf-8")
+            log = EventLog(root=Path(tmp) / "memory")
+            env = normalize_envelope(
+                {"session_id": "s1", "trace_id": "trace1", "text": "find evidence"}
+            )
+            out = resolve_repository_context(
+                env,
+                project_root=root,
+                needs=[
+                    InformationNeed(
+                        id="p1",
+                        description="README",
+                        kind="exact_path",
+                        path="README.md",
+                    )
+                ],
+                allow_qmd=False,
+                event_log=log,
+            )
+            self.assertEqual(out["harness_id"], "hermes")
+>           self.assertEqual(out["packet"]["evidence"][0]["locator"], str(root / "README.md"))
+E           AssertionError: '/workspace/hermes-home/profiles/ayo/cache/scratch/tmpxb9c1a6g/repo/README.md' != '/home/kvn/.hermes/profiles/ayo/cache/scratch/tmpxb9c1a6g/repo/README.md'
+E           - /workspace/hermes-home/profiles/ayo/cache/scratch/tmpxb9c1a6g/repo/README.md
+E           ?  ^ ^^^^^^        -----
+E           + /home/kvn/.hermes/profiles/ayo/cache/scratch/tmpxb9c1a6g/repo/README.md
+E           ?  ^ ^  +++++
+
+tests/test_hermes_adapter.py:73: AssertionError
+___ test_on_injects_prior_view_registers_tools_and_uses_a_hermes_local_root ____
+
+env = PosixPath('/workspace/hermes-home/profiles/ayo/cache/scratch/pytest-of-kvn/pytest-0/test_on_injects_prior_view_reg0/z0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7fccf24383d0>
+
+    def test_on_injects_prior_view_registers_tools_and_uses_a_hermes_local_root(env, monkeypatch):
+        switch = env / "optchat" / "enabled"
+        switch.parent.mkdir(parents=True)
+        switch.write_text("off\n")
+        _, ctx = start(monkeypatch, "on")
+        assert pre(ctx, "t1", "keep the Hermes OptChat path local") == ""
+        post(ctx, "t1", "done")
+        view = pre(ctx, "t2", "what did I say?")
+>       assert "OptChat view of earlier Hermes messages" in view
+E       AssertionError: assert 'OptChat view of earlier Hermes messages' in ''
+
+tests/test_hermes_optchat.py:95: AssertionError
+____________ test_tool_and_result_appends_do_not_block_the_hot_hook ____________
+
+env = PosixPath('/workspace/hermes-home/profiles/ayo/cache/scratch/pytest-of-kvn/pytest-0/test_tool_and_result_appends_d0/z0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7fccf2377a80>
+
+    def test_tool_and_result_appends_do_not_block_the_hot_hook(env, monkeypatch):
+        _, ctx = start(monkeypatch, "on")
+        pre(ctx, "t1", "run the check")
+        t0 = time.perf_counter()
+        ctx.call(
+            "post_tool_call",
+            session_id="s1",
+            turn_id="t1",
+            tool_name="terminal",
+            args={"command": "pytest -q"},
+            result={"content": [{"type": "text", "text": "3 passed"}]},
+            status="ok",
+        )
+        assert time.perf_counter() - t0 < 0.1
+        post(ctx, "t1", "green")
+        view = pre(ctx, "t2", "status?")
+>       assert "tool: terminal" in view
+E       AssertionError: assert 'tool: terminal' in ''
+
+tests/test_hermes_optchat.py:123: AssertionError
+_________________ test_shadow_records_but_is_not_model_visible _________________
+
+env = PosixPath('/workspace/hermes-home/profiles/ayo/cache/scratch/pytest-of-kvn/pytest-0/test_shadow_records_but_is_not0/z0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7fccf23bfaf0>
+
+    def test_shadow_records_but_is_not_model_visible(env, monkeypatch):
+        _, ctx = start(monkeypatch, "shadow")
+        assert pre(ctx, "t1", "shadow-only message") == ""
+        post(ctx, "t1", "shadow reply")
+        assert pre(ctx, "t2", "next") == ""
+        assert ctx.tools == {}
+        close(ctx)
+        text = chat_text(env)
+>       assert "shadow-only message" in text and "shadow reply" in text
+E       AssertionError: assert ('shadow-only message' in '')
+
+tests/test_hermes_optchat.py:137: AssertionError
+___________ test_shadow_disables_compaction_even_when_omp_is_enabled ___________
+
+env = PosixPath('/workspace/hermes-home/profiles/ayo/cache/scratch/pytest-of-kvn/pytest-0/test_shadow_disables_compactio0/z0')
+
+    def test_shadow_disables_compaction_even_when_omp_is_enabled(env):
+        switch = env / "optchat" / "enabled"
+        switch.parent.mkdir(parents=True)
+        switch.write_text("on\n")
+        client = load_plugin()._optchat_module().create({"optchat_mode": "shadow"}, env, sys.executable)
+        text = "private shadow text " * 100
+        try:
+            saved = client._submit("record", {"kind": "user", "text": text}, wait=True)
+>           assert saved["ok"] is True and saved["logged"] is True
+E           assert (False is True)
+
+tests/test_hermes_optchat.py:148: AssertionError
+________ test_hook_subprocess_wall_time_is_within_bare_python_plus_40ms ________
+
+tmp_path = PosixPath('/workspace/hermes-home/profiles/ayo/cache/scratch/pytest-of-kvn/pytest-0/test_hook_subprocess_wall_time0')
+
+    def test_hook_subprocess_wall_time_is_within_bare_python_plus_40ms(tmp_path):
+        """p95 hook wall time <= p95 bare-python wall time + 40 ms, both measured in this run, interleaved.
+    
+        The detached builds wait on held build slots while timing runs, so the test does not load the host
+        itself; on a shared host a burst from another tenant can still inflate one round, so the bound must hold
+        in at least one of three rounds, each against its own baseline.
+        """
+        env = {k: v for k, v in os.environ.items() if k not in CLEAN}
+        env['Z0INT_HOME'] = str(tmp_path / 'z0')
+        plain = tmp_path / 'plain'
+        plain.mkdir()
+    
+        def wall(argv, stdin=''):
+            t0 = time.perf_counter()
+            subprocess.run(argv, input=stdin, text=True, env=env, capture_output=True, check=True)
+            return time.perf_counter() - t0
+    
+        def p95(xs):
+            return sorted(xs)[int(len(xs) * 0.95) - 1]
+    
+        held = []
+        for i in range(hc.MAX_CHILDREN):
+            path = hc.slot_path(i, root=tmp_path / 'z0')
+            path.parent.mkdir(parents=True, exist_ok=True)
+            held.append(open(path, 'a'))
+            fcntl.flock(held[-1], fcntl.LOCK_EX)
+        rounds = []
+        try:
+            for r in range(3):
+                bare, timed = [], {h: [] for h in HOOK_FAMILY}
+                for i in range(20):  # interleaved, so host load hits the baseline and the hook alike
+                    bare.append(wall([sys.executable, '-c', 'pass']))
+                    for h in HOOK_FAMILY:
+                        raw = json.dumps(payload(h, 100 * r + i, cwd=plain, prompt=f'question {r}.{i}'))
+                        timed[h].append(wall([sys.executable, '-m', 'z0int.hook_adapter', '--harness', h, 'prompt'], raw))
+                rounds.append({'bare_ms': round(p95(bare) * 1000, 1),
+                               **{h: round(p95(xs) * 1000, 1) for h, xs in timed.items()}})
+                if all(p95(xs) <= p95(bare) + 0.040 for xs in timed.values()):
+                    break
+        finally:
+            for fh in held:
+                fh.close()
+>       assert all(rounds[-1][h] <= rounds[-1]['bare_ms'] + 40.0 for h in HOOK_FAMILY), rounds
+E       AssertionError: [{'bare_ms': 41.3, 'claude-code': 88.8, 'codex': 124.0, 'grok': 107.9}, {'bare_ms': 30.1, 'claude-code': 81.2, 'codex': 71.5, 'grok': 79.1}, {'bare_ms': 37.9, 'claude-code': 79.0, 'codex': 88.9, 'grok': 112.0}]
+E       assert False
+E        +  where False = all(<generator object test_hook_subprocess_wall_time_is_within_bare_python_plus_40ms.<locals>.<genexpr> at 0x7fccf23f8900>)
+
+tests/test_hook_adapter.py:195: AssertionError
+______________________ test_health_and_bounded_admission _______________________
+
+    def test_health_and_bounded_admission():
+        server=Service(('127.0.0.1',0),Handler)
+        thread=threading.Thread(target=server.serve_forever,daemon=True);thread.start()
+        address=server.server_address
+        sockets=[]
+        try:
+>           with urllib.request.urlopen(f'http://127.0.0.1:{address[1]}/readyz') as r:assert r.status==200
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_intelligence_service.py:15: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/home/kvn/.local/share/uv/python/cpython-3.13.13-linux-x86_64-gnu/lib/python3.13/urllib/request.py:189: in urlopen
+    return opener.open(url, data, timeout)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/home/kvn/.local/share/uv/python/cpython-3.13.13-linux-x86_64-gnu/lib/python3.13/urllib/request.py:495: in open
+    response = meth(req, response)
+               ^^^^^^^^^^^^^^^^^^^
+/home/kvn/.local/share/uv/python/cpython-3.13.13-linux-x86_64-gnu/lib/python3.13/urllib/request.py:604: in http_response
+    response = self.parent.error(
+/home/kvn/.local/share/uv/python/cpython-3.13.13-linux-x86_64-gnu/lib/python3.13/urllib/request.py:533: in error
+    return self._call_chain(*args)
+           ^^^^^^^^^^^^^^^^^^^^^^^
+/home/kvn/.local/share/uv/python/cpython-3.13.13-linux-x86_64-gnu/lib/python3.13/urllib/request.py:466: in _call_chain
+    result = func(*args)
+             ^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <urllib.request.HTTPDefaultErrorHandler object at 0x7fccf31c4ec0>
+req = <urllib.request.Request object at 0x7fccf23b9f10>
+fp = <http.client.HTTPResponse object at 0x7fccdacea530>, code = 503
+msg = 'Service Unavailable'
+hdrs = <http.client.HTTPMessage object at 0x7fccf1976490>
+
+    def http_error_default(self, req, fp, code, msg, hdrs):
+>       raise HTTPError(req.full_url, code, msg, hdrs, fp)
+E       urllib.error.HTTPError: HTTP Error 503: Service Unavailable
+
+/home/kvn/.local/share/uv/python/cpython-3.13.13-linux-x86_64-gnu/lib/python3.13/urllib/request.py:613: HTTPError
+_____ test_omp_v1_spine_imports_gold_and_negative_tiers_as_the_only_labels _____
+
+tmp_path = PosixPath('/workspace/hermes-home/profiles/ayo/cache/scratch/pytest-of-kvn/pytest-0/test_omp_v1_spine_imports_gold0')
+spine = PosixPath('/workspace/hermes-home/profiles/ayo/cache/scratch/pytest-of-kvn/pytest-0/test_omp_v1_spine_imports_gold0/legacy/receipts')
+
+    def test_omp_v1_spine_imports_gold_and_negative_tiers_as_the_only_labels(tmp_path, spine):
+        home = tmp_path / 'z0'
+>       man = li.import_omp_v1(spine / 'decisions.jsonl', spine / 'outcomes.jsonl', root=home)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_legacy_import.py:61: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/z0int/legacy_import.py:188: in import_omp_v1
+    for _, row in run.lines(path, key):
+                  ^^^^^^^^^^^^^^^^^^^^
+src/z0int/legacy_import.py:100: in lines
+    path = _guard(path)
+           ^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+path = PosixPath('/workspace/hermes-home/profiles/ayo/cache/scratch/pytest-of-kvn/pytest-0/test_omp_v1_spine_imports_gold0/legacy/receipts/decisions.jsonl')
+
+    def _guard(path: Path) -> Path:
+        """Refuse a source under a live harness home before anything opens it. realpath resolves symlinks (lstat and
+        readlink only), so a link that points into the home is refused as well."""
+        p = os.path.abspath(os.path.expanduser(str(path)))
+        roots = {*REFUSED_ROOTS, *map(os.path.realpath, REFUSED_ROOTS)}
+        if any(q == r or q.startswith(r + '/') for q in (p, os.path.realpath(p)) for r in roots):
+>           raise ValueError(f'refusing to read {p}: legacy imports never read /workspace/hermes-home')
+E           ValueError: refusing to read /workspace/hermes-home/profiles/ayo/cache/scratch/pytest-of-kvn/pytest-0/test_omp_v1_spine_imports_gold0/legacy/receipts/decisions.jsonl: legacy imports never read /workspace/hermes-home
+
+src/z0int/legacy_import.py:70: ValueError
+___________ test_omp_v1_rerun_adds_zero_rows_and_keeps_the_manifest ____________
+
+tmp_path = PosixPath('/workspace/hermes-home/profiles/ayo/cache/scratch/pytest-of-kvn/pytest-0/test_omp_v1_rerun_adds_zero_ro0')
+spine = PosixPath('/workspace/hermes-home/profiles/ayo/cache/scratch/pytest-of-kvn/pytest-0/test_omp_v1_rerun_adds_zero_ro0/legacy/receipts')
+
+    def test_omp_v1_rerun_adds_zero_rows_and_keeps_the_manifest(tmp_path, spine):
+        home = tmp_path / 'z0'
+>       first = li.import_omp_v1(spine / 'decisions.jsonl', spine / 'outcomes.jsonl', root=home)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_legacy_import.py:79: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/z0int/legacy_import.py:188: in import_omp_v1
+    for _, row in run.lines(path, key):
+                  ^^^^^^^^^^^^^^^^^^^^
+src/z0int/legacy_import.py:100: in lines
+    path = _guard(path)
+           ^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+path = PosixPath('/workspace/hermes-home/profiles/ayo/cache/scratch/pytest-of-kvn/pytest-0/test_omp_v1_rerun_adds_zero_ro0/legacy/receipts/decisions.jsonl')
+
+    def _guard(path: Path) -> Path:
+        """Refuse a source under a live harness home before anything opens it. realpath resolves symlinks (lstat and
+        readlink only), so a link that points into the home is refused as well."""
+        p = os.path.abspath(os.path.expanduser(str(path)))
+        roots = {*REFUSED_ROOTS, *map(os.path.realpath, REFUSED_ROOTS)}
+        if any(q == r or q.startswith(r + '/') for q in (p, os.path.realpath(p)) for r in roots):
+>           raise ValueError(f'refusing to read {p}: legacy imports never read /workspace/hermes-home')
+E           ValueError: refusing to read /workspace/hermes-home/profiles/ayo/cache/scratch/pytest-of-kvn/pytest-0/test_omp_v1_rerun_adds_zero_ro0/legacy/receipts/decisions.jsonl: legacy imports never read /workspace/hermes-home
+
+src/z0int/legacy_import.py:70: ValueError
+_______________ test_cognition_shadow_keeps_served_answers_only ________________
+
+tmp_path = PosixPath('/workspace/hermes-home/profiles/ayo/cache/scratch/pytest-of-kvn/pytest-0/test_cognition_shadow_keeps_se0')
+
+    def test_cognition_shadow_keeps_served_answers_only(tmp_path):
+        src = tmp_path / 'legacy' / 'shadow' / 'cognition-shadow.jsonl'
+        write(src, [shadow_receipt(i, served=i in (17, 4242)) for i in range(6902)])
+        home = tmp_path / 'z0'
+>       man = li.import_cognition_shadow(src, root=home)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_legacy_import.py:108: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/z0int/legacy_import.py:222: in import_cognition_shadow
+    for _, rec in run.lines(path, 'omp-cognition-shadow'):
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src/z0int/legacy_import.py:100: in lines
+    path = _guard(path)
+           ^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+path = PosixPath('/workspace/hermes-home/profiles/ayo/cache/scratch/pytest-of-kvn/pytest-0/test_cognition_shadow_keeps_se0/legacy/shadow/cognition-shadow.jsonl')
+
+    def _guard(path: Path) -> Path:
+        """Refuse a source under a live harness home before anything opens it. realpath resolves symlinks (lstat and
+        readlink only), so a link that points into the home is refused as well."""
+        p = os.path.abspath(os.path.expanduser(str(path)))
+        roots = {*REFUSED_ROOTS, *map(os.path.realpath, REFUSED_ROOTS)}
+        if any(q == r or q.startswith(r + '/') for q in (p, os.path.realpath(p)) for r in roots):
+>           raise ValueError(f'refusing to read {p}: legacy imports never read /workspace/hermes-home')
+E           ValueError: refusing to read /workspace/hermes-home/profiles/ayo/cache/scratch/pytest-of-kvn/pytest-0/test_cognition_shadow_keeps_se0/legacy/shadow/cognition-shadow.jsonl: legacy imports never read /workspace/hermes-home
+
+src/z0int/legacy_import.py:70: ValueError
+_ test_cognition_import_prefers_structured_identity_without_prompt_text[identity0] _
+
+tmp_path = PosixPath('/workspace/hermes-home/profiles/ayo/cache/scratch/pytest-of-kvn/pytest-0/test_cognition_import_prefers_0')
+identity = {'actual_tool': {'input': 'secret', 'name': 'edit', 'risk_class': 'write'}}
+
+    @pytest.mark.parametrize('identity', [
+        {'actual_tool': {'name': 'edit', 'risk_class': 'write', 'input': 'secret'}},
+        {'tool_name': 'edit'},
+    ])
+    def test_cognition_import_prefers_structured_identity_without_prompt_text(tmp_path, identity):
+        src = tmp_path / 'legacy' / 'shadow.jsonl'
+        receipt = shadow_receipt(1, served=True)
+        receipt.update(identity)
+        write(src, [receipt])
+        home = tmp_path / 'z0'
+>       li.import_cognition_shadow(src, root=home)
+
+tests/test_legacy_import.py:131: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/z0int/legacy_import.py:222: in import_cognition_shadow
+    for _, rec in run.lines(path, 'omp-cognition-shadow'):
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src/z0int/legacy_import.py:100: in lines
+    path = _guard(path)
+           ^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+path = PosixPath('/workspace/hermes-home/profiles/ayo/cache/scratch/pytest-of-kvn/pytest-0/test_cognition_import_prefers_0/legacy/shadow.jsonl')
+
+    def _guard(path: Path) -> Path:
+        """Refuse a source under a live harness home before anything opens it. realpath resolves symlinks (lstat and
+        readlink only), so a link that points into the home is refused as well."""
+        p = os.path.abspath(os.path.expanduser(str(path)))
+        roots = {*REFUSED_ROOTS, *map(os.path.realpath, REFUSED_ROOTS)}
+        if any(q == r or q.startswith(r + '/') for q in (p, os.path.realpath(p)) for r in roots):
+>           raise ValueError(f'refusing to read {p}: legacy imports never read /workspace/hermes-home')
+E           ValueError: refusing to read /workspace/hermes-home/profiles/ayo/cache/scratch/pytest-of-kvn/pytest-0/test_cognition_import_prefers_0/legacy/shadow.jsonl: legacy imports never read /workspace/hermes-home
+
+src/z0int/legacy_import.py:70: ValueError
+_ test_cognition_import_prefers_structured_identity_without_prompt_text[identity1] _
+
+tmp_path = PosixPath('/workspace/hermes-home/profiles/ayo/cache/scratch/pytest-of-kvn/pytest-0/test_cognition_import_prefers_1')
+identity = {'tool_name': 'edit'}
+
+    @pytest.mark.parametrize('identity', [
+        {'actual_tool': {'name': 'edit', 'risk_class': 'write', 'input': 'secret'}},
+        {'tool_name': 'edit'},
+    ])
+    def test_cognition_import_prefers_structured_identity_without_prompt_text(tmp_path, identity):
+        src = tmp_path / 'legacy' / 'shadow.jsonl'
+        receipt = shadow_receipt(1, served=True)
+        receipt.update(identity)
+        write(src, [receipt])
+        home = tmp_path / 'z0'
+>       li.import_cognition_shadow(src, root=home)
+
+tests/test_legacy_import.py:131: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/z0int/legacy_import.py:222: in import_cognition_shadow
+    for _, rec in run.lines(path, 'omp-cognition-shadow'):
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src/z0int/legacy_import.py:100: in lines
+    path = _guard(path)
+           ^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+path = PosixPath('/workspace/hermes-home/profiles/ayo/cache/scratch/pytest-of-kvn/pytest-0/test_cognition_import_prefers_1/legacy/shadow.jsonl')
+
+    def _guard(path: Path) -> Path:
+        """Refuse a source under a live harness home before anything opens it. realpath resolves symlinks (lstat and
+        readlink only), so a link that points into the home is refused as well."""
+        p = os.path.abspath(os.path.expanduser(str(path)))
+        roots = {*REFUSED_ROOTS, *map(os.path.realpath, REFUSED_ROOTS)}
+        if any(q == r or q.startswith(r + '/') for q in (p, os.path.realpath(p)) for r in roots):
+>           raise ValueError(f'refusing to read {p}: legacy imports never read /workspace/hermes-home')
+E           ValueError: refusing to read /workspace/hermes-home/profiles/ayo/cache/scratch/pytest-of-kvn/pytest-0/test_cognition_import_prefers_1/legacy/shadow.jsonl: legacy imports never read /workspace/hermes-home
+
+src/z0int/legacy_import.py:70: ValueError
+_______ test_dsh_jev_receipts_become_legacy_shadow_decisions_never_gold ________
+
+tmp_path = PosixPath('/workspace/hermes-home/profiles/ayo/cache/scratch/pytest-of-kvn/pytest-0/test_dsh_jev_receipts_become_l0')
+
+    def test_dsh_jev_receipts_become_legacy_shadow_decisions_never_gold(tmp_path):
+        src = tmp_path / 'legacy' / 'dsh' / 'jev' / 'receipts.jsonl'
+        write(src, dsh_rows())
+        home = tmp_path / 'z0'
+>       man = li.import_dsh_jev(src, root=home)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_legacy_import.py:168: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/z0int/legacy_import.py:281: in import_dsh_jev
+    lines = run.lines(_guard(path), 'dsh-jev')
+                      ^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+path = PosixPath('/workspace/hermes-home/profiles/ayo/cache/scratch/pytest-of-kvn/pytest-0/test_dsh_jev_receipts_become_l0/legacy/dsh/jev/receipts.jsonl')
+
+    def _guard(path: Path) -> Path:
+        """Refuse a source under a live harness home before anything opens it. realpath resolves symlinks (lstat and
+        readlink only), so a link that points into the home is refused as well."""
+        p = os.path.abspath(os.path.expanduser(str(path)))
+        roots = {*REFUSED_ROOTS, *map(os.path.realpath, REFUSED_ROOTS)}
+        if any(q == r or q.startswith(r + '/') for q in (p, os.path.realpath(p)) for r in roots):
+>           raise ValueError(f'refusing to read {p}: legacy imports never read /workspace/hermes-home')
+E           ValueError: refusing to read /workspace/hermes-home/profiles/ayo/cache/scratch/pytest-of-kvn/pytest-0/test_dsh_jev_receipts_become_l0/legacy/dsh/jev/receipts.jsonl: legacy imports never read /workspace/hermes-home
+
+src/z0int/legacy_import.py:70: ValueError
+__________________ test_dsh_importer_never_reads_hermes_home ___________________
+
+tmp_path = PosixPath('/workspace/hermes-home/profiles/ayo/cache/scratch/pytest-of-kvn/pytest-0/test_dsh_importer_never_reads_0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7fcc87119e10>
+
+    def test_dsh_importer_never_reads_hermes_home(tmp_path, monkeypatch):
+        src = tmp_path / 'legacy' / 'dsh' / 'jev' / 'receipts.jsonl'
+        write(src, dsh_rows())
+        opened = []
+        real_open, real_path_open = builtins.open, Path.open
+    
+        def refuse(name):  # the spy itself never lets an open reach the live home (or the link that points there)
+            opened.append(name)
+            if 'hermes-home' in name or name.endswith('innocent.jsonl'):
+                raise PermissionError(f'test spy refused {name}')
+    
+        def spy(file, *a, **k):
+            refuse(str(file))
+            return real_open(file, *a, **k)
+    
+        def spy_path(self, *a, **k):
+            refuse(str(self))
+            return real_path_open(self, *a, **k)
+        monkeypatch.setattr(builtins, 'open', spy)
+        monkeypatch.setattr(Path, 'open', spy_path)
+        monkeypatch.setenv('HERMES_HOME', '/workspace/hermes-home')
+>       li.import_dsh_jev(src, root=tmp_path / 'z0')
+
+tests/test_legacy_import.py:204: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/z0int/legacy_import.py:281: in import_dsh_jev
+    lines = run.lines(_guard(path), 'dsh-jev')
+                      ^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+path = PosixPath('/workspace/hermes-home/profiles/ayo/cache/scratch/pytest-of-kvn/pytest-0/test_dsh_importer_never_reads_0/legacy/dsh/jev/receipts.jsonl')
+
+    def _guard(path: Path) -> Path:
+        """Refuse a source under a live harness home before anything opens it. realpath resolves symlinks (lstat and
+        readlink only), so a link that points into the home is refused as well."""
+        p = os.path.abspath(os.path.expanduser(str(path)))
+        roots = {*REFUSED_ROOTS, *map(os.path.realpath, REFUSED_ROOTS)}
+        if any(q == r or q.startswith(r + '/') for q in (p, os.path.realpath(p)) for r in roots):
+>           raise ValueError(f'refusing to read {p}: legacy imports never read /workspace/hermes-home')
+E           ValueError: refusing to read /workspace/hermes-home/profiles/ayo/cache/scratch/pytest-of-kvn/pytest-0/test_dsh_importer_never_reads_0/legacy/dsh/jev/receipts.jsonl: legacy imports never read /workspace/hermes-home
+
+src/z0int/legacy_import.py:70: ValueError
+_____________ test_dsh_jev_orphan_decision_never_stalls_the_import _____________
+
+tmp_path = PosixPath('/workspace/hermes-home/profiles/ayo/cache/scratch/pytest-of-kvn/pytest-0/test_dsh_jev_orphan_decision_n0')
+
+    def test_dsh_jev_orphan_decision_never_stalls_the_import(tmp_path):
+        """A jev_decision whose model_request never came (a crash) must not hold back every later agent's rows."""
+        src = tmp_path / 'legacy' / 'jev.jsonl'
+        home = tmp_path / 'z0'
+        t = 1_780_000_000.0
+        orphan = {'ts': '2026-05-28T20:26:40.000Z', 'harness': 'dsh', 'type': 'jev_decision', 'agentId': 'crashed',
+                  'turn': 1, 'policy': 'jev-v3', 'tier': 'hard'}
+        unrouted = {'ts': '2026-05-28T20:26:41.000Z', 'harness': 'dsh', 'type': 'model_request', 'agentId': 'z',
+                    'turn': 1, 'routed': False, 'session_id': 'dsh-z'}
+        write(src, [orphan, unrouted] + jev_pair('b', 1, '2026-05-28T20:26:42.000Z', 'dsh-b')
+              + jev_pair('c', 1, '2026-05-28T20:26:43.000Z', 'dsh-c'))
+        out = hc.state_dir('dsh', home) / 'shadow_decisions.jsonl'
+        # while the orphan is fresh and at the tail it is held, but the other agents' rows are imported now
+>       first = li.import_dsh_jev(src, root=home, now=t + 60)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_legacy_import.py:237: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/z0int/legacy_import.py:281: in import_dsh_jev
+    lines = run.lines(_guard(path), 'dsh-jev')
+                      ^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+path = PosixPath('/workspace/hermes-home/profiles/ayo/cache/scratch/pytest-of-kvn/pytest-0/test_dsh_jev_orphan_decision_n0/legacy/jev.jsonl')
+
+    def _guard(path: Path) -> Path:
+        """Refuse a source under a live harness home before anything opens it. realpath resolves symlinks (lstat and
+        readlink only), so a link that points into the home is refused as well."""
+        p = os.path.abspath(os.path.expanduser(str(path)))
+        roots = {*REFUSED_ROOTS, *map(os.path.realpath, REFUSED_ROOTS)}
+        if any(q == r or q.startswith(r + '/') for q in (p, os.path.realpath(p)) for r in roots):
+>           raise ValueError(f'refusing to read {p}: legacy imports never read /workspace/hermes-home')
+E           ValueError: refusing to read /workspace/hermes-home/profiles/ayo/cache/scratch/pytest-of-kvn/pytest-0/test_dsh_jev_orphan_decision_n0/legacy/jev.jsonl: legacy imports never read /workspace/hermes-home
+
+src/z0int/legacy_import.py:70: ValueError
+__________ test_dsh_jev_orphan_that_is_no_longer_the_tail_is_imported __________
+
+tmp_path = PosixPath('/workspace/hermes-home/profiles/ayo/cache/scratch/pytest-of-kvn/pytest-0/test_dsh_jev_orphan_that_is_no0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7fcc87117070>
+
+    def test_dsh_jev_orphan_that_is_no_longer_the_tail_is_imported(tmp_path, monkeypatch):
+        monkeypatch.setattr(li, 'JEV_TAIL_LINES', 2)
+        src = tmp_path / 'legacy' / 'jev.jsonl'
+        home = tmp_path / 'z0'
+        orphan = {'ts': '2026-05-28T20:26:40.000Z', 'harness': 'dsh', 'type': 'jev_decision', 'agentId': 'crashed',
+                  'turn': 1, 'tier': 'hard'}
+        write(src, [orphan] + jev_pair('b', 1, '2026-05-28T20:26:42.000Z', 'dsh-b')
+              + jev_pair('c', 1, '2026-05-28T20:26:43.000Z', 'dsh-c'))
+>       man = li.import_dsh_jev(src, root=home, now=1_780_000_000.0 + 1)  # fresh, but four lines follow it
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_legacy_import.py:259: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/z0int/legacy_import.py:281: in import_dsh_jev
+    lines = run.lines(_guard(path), 'dsh-jev')
+                      ^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+path = PosixPath('/workspace/hermes-home/profiles/ayo/cache/scratch/pytest-of-kvn/pytest-0/test_dsh_jev_orphan_that_is_no0/legacy/jev.jsonl')
+
+    def _guard(path: Path) -> Path:
+        """Refuse a source under a live harness home before anything opens it. realpath resolves symlinks (lstat and
+        readlink only), so a link that points into the home is refused as well."""
+        p = os.path.abspath(os.path.expanduser(str(path)))
+        roots = {*REFUSED_ROOTS, *map(os.path.realpath, REFUSED_ROOTS)}
+        if any(q == r or q.startswith(r + '/') for q in (p, os.path.realpath(p)) for r in roots):
+>           raise ValueError(f'refusing to read {p}: legacy imports never read /workspace/hermes-home')
+E           ValueError: refusing to read /workspace/hermes-home/profiles/ayo/cache/scratch/pytest-of-kvn/pytest-0/test_dsh_jev_orphan_that_is_no0/legacy/jev.jsonl: legacy imports never read /workspace/hermes-home
+
+src/z0int/legacy_import.py:70: ValueError
+____ test_scrub_correction_leaves_one_row_per_turn_with_the_corrected_label ____
+
+tmp_path = PosixPath('/workspace/hermes-home/profiles/ayo/cache/scratch/pytest-of-kvn/pytest-0/test_scrub_correction_leaves_o0')
+spine = PosixPath('/workspace/hermes-home/profiles/ayo/cache/scratch/pytest-of-kvn/pytest-0/test_scrub_correction_leaves_o0/legacy/receipts')
+
+    def test_scrub_correction_leaves_one_row_per_turn_with_the_corrected_label(tmp_path, spine):
+        """receipt.scrub_contaminated_outcomes appends a downgraded outcome_join.v1: only the latest row is exported."""
+        home = tmp_path / 'z0'
+>       li.import_omp_v1(spine / 'decisions.jsonl', spine / 'outcomes.jsonl', root=home)
+
+tests/test_legacy_import.py:266: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/z0int/legacy_import.py:188: in import_omp_v1
+    for _, row in run.lines(path, key):
+                  ^^^^^^^^^^^^^^^^^^^^
+src/z0int/legacy_import.py:100: in lines
+    path = _guard(path)
+           ^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+path = PosixPath('/workspace/hermes-home/profiles/ayo/cache/scratch/pytest-of-kvn/pytest-0/test_scrub_correction_leaves_o0/legacy/receipts/decisions.jsonl')
+
+    def _guard(path: Path) -> Path:
+        """Refuse a source under a live harness home before anything opens it. realpath resolves symlinks (lstat and
+        readlink only), so a link that points into the home is refused as well."""
+        p = os.path.abspath(os.path.expanduser(str(path)))
+        roots = {*REFUSED_ROOTS, *map(os.path.realpath, REFUSED_ROOTS)}
+        if any(q == r or q.startswith(r + '/') for q in (p, os.path.realpath(p)) for r in roots):
+>           raise ValueError(f'refusing to read {p}: legacy imports never read /workspace/hermes-home')
+E           ValueError: refusing to read /workspace/hermes-home/profiles/ayo/cache/scratch/pytest-of-kvn/pytest-0/test_scrub_correction_leaves_o0/legacy/receipts/decisions.jsonl: legacy imports never read /workspace/hermes-home
+
+src/z0int/legacy_import.py:70: ValueError
+_____________ test_shadow_tables_keep_the_latest_row_per_decision ______________
+
+tmp_path = PosixPath('/workspace/hermes-home/profiles/ayo/cache/scratch/pytest-of-kvn/pytest-0/test_shadow_tables_keep_the_la0')
+
+    def test_shadow_tables_keep_the_latest_row_per_decision(tmp_path):
+        src = tmp_path / 'legacy' / 'cs.jsonl'
+        write(src, [shadow_receipt(i, served=True) for i in range(2)])
+        home = tmp_path / 'z0'
+>       li.import_cognition_shadow(src, root=home)
+
+tests/test_legacy_import.py:283: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/z0int/legacy_import.py:222: in import_cognition_shadow
+    for _, rec in run.lines(path, 'omp-cognition-shadow'):
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src/z0int/legacy_import.py:100: in lines
+    path = _guard(path)
+           ^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+path = PosixPath('/workspace/hermes-home/profiles/ayo/cache/scratch/pytest-of-kvn/pytest-0/test_shadow_tables_keep_the_la0/legacy/cs.jsonl')
+
+    def _guard(path: Path) -> Path:
+        """Refuse a source under a live harness home before anything opens it. realpath resolves symlinks (lstat and
+        readlink only), so a link that points into the home is refused as well."""
+        p = os.path.abspath(os.path.expanduser(str(path)))
+        roots = {*REFUSED_ROOTS, *map(os.path.realpath, REFUSED_ROOTS)}
+        if any(q == r or q.startswith(r + '/') for q in (p, os.path.realpath(p)) for r in roots):
+>           raise ValueError(f'refusing to read {p}: legacy imports never read /workspace/hermes-home')
+E           ValueError: refusing to read /workspace/hermes-home/profiles/ayo/cache/scratch/pytest-of-kvn/pytest-0/test_shadow_tables_keep_the_la0/legacy/cs.jsonl: legacy imports never read /workspace/hermes-home
+
+src/z0int/legacy_import.py:70: ValueError
+________________ test_every_importer_is_idempotent_by_watermark ________________
+
+tmp_path = PosixPath('/workspace/hermes-home/profiles/ayo/cache/scratch/pytest-of-kvn/pytest-0/test_every_importer_is_idempot0')
+spine = PosixPath('/workspace/hermes-home/profiles/ayo/cache/scratch/pytest-of-kvn/pytest-0/test_every_importer_is_idempot0/legacy/receipts')
+
+    def test_every_importer_is_idempotent_by_watermark(tmp_path, spine):
+        shadow = tmp_path / 'legacy' / 'cs.jsonl'
+        write(shadow, [shadow_receipt(i, served=i % 2 == 0) for i in range(6)])
+        jev = tmp_path / 'legacy' / 'jev.jsonl'
+        write(jev, dsh_rows())
+        home = tmp_path / 'z0'
+        runs = [lambda: li.import_omp_v1(spine / 'decisions.jsonl', spine / 'outcomes.jsonl', root=home),
+                lambda: li.import_cognition_shadow(shadow, root=home),
+                lambda: li.import_dsh_jev(jev, root=home)]
+        for run in runs:
+>           first, second = run(), run()
+                            ^^^^^
+
+tests/test_legacy_import.py:303: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_legacy_import.py:299: in <lambda>
+    runs = [lambda: li.import_omp_v1(spine / 'decisions.jsonl', spine / 'outcomes.jsonl', root=home),
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src/z0int/legacy_import.py:188: in import_omp_v1
+    for _, row in run.lines(path, key):
+                  ^^^^^^^^^^^^^^^^^^^^
+src/z0int/legacy_import.py:100: in lines
+    path = _guard(path)
+           ^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+path = PosixPath('/workspace/hermes-home/profiles/ayo/cache/scratch/pytest-of-kvn/pytest-0/test_every_importer_is_idempot0/legacy/receipts/decisions.jsonl')
+
+    def _guard(path: Path) -> Path:
+        """Refuse a source under a live harness home before anything opens it. realpath resolves symlinks (lstat and
+        readlink only), so a link that points into the home is refused as well."""
+        p = os.path.abspath(os.path.expanduser(str(path)))
+        roots = {*REFUSED_ROOTS, *map(os.path.realpath, REFUSED_ROOTS)}
+        if any(q == r or q.startswith(r + '/') for q in (p, os.path.realpath(p)) for r in roots):
+>           raise ValueError(f'refusing to read {p}: legacy imports never read /workspace/hermes-home')
+E           ValueError: refusing to read /workspace/hermes-home/profiles/ayo/cache/scratch/pytest-of-kvn/pytest-0/test_every_importer_is_idempot0/legacy/receipts/decisions.jsonl: legacy imports never read /workspace/hermes-home
+
+src/z0int/legacy_import.py:70: ValueError
+_______________________ test_new_tables_refuse_text_keys _______________________
+
+tmp_path = PosixPath('/workspace/hermes-home/profiles/ayo/cache/scratch/pytest-of-kvn/pytest-0/test_new_tables_refuse_text_ke0')
+spine = PosixPath('/workspace/hermes-home/profiles/ayo/cache/scratch/pytest-of-kvn/pytest-0/test_new_tables_refuse_text_ke0/legacy/receipts')
+
+    def test_new_tables_refuse_text_keys(tmp_path, spine):
+        home = tmp_path / 'z0'
+>       li.import_omp_v1(spine / 'decisions.jsonl', spine / 'outcomes.jsonl', root=home)
+
+tests/test_legacy_import.py:312: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/z0int/legacy_import.py:188: in import_omp_v1
+    for _, row in run.lines(path, key):
+                  ^^^^^^^^^^^^^^^^^^^^
+src/z0int/legacy_import.py:100: in lines
+    path = _guard(path)
+           ^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+path = PosixPath('/workspace/hermes-home/profiles/ayo/cache/scratch/pytest-of-kvn/pytest-0/test_new_tables_refuse_text_ke0/legacy/receipts/decisions.jsonl')
+
+    def _guard(path: Path) -> Path:
+        """Refuse a source under a live harness home before anything opens it. realpath resolves symlinks (lstat and
+        readlink only), so a link that points into the home is refused as well."""
+        p = os.path.abspath(os.path.expanduser(str(path)))
+        roots = {*REFUSED_ROOTS, *map(os.path.realpath, REFUSED_ROOTS)}
+        if any(q == r or q.startswith(r + '/') for q in (p, os.path.realpath(p)) for r in roots):
+>           raise ValueError(f'refusing to read {p}: legacy imports never read /workspace/hermes-home')
+E           ValueError: refusing to read /workspace/hermes-home/profiles/ayo/cache/scratch/pytest-of-kvn/pytest-0/test_new_tables_refuse_text_ke0/legacy/receipts/decisions.jsonl: legacy imports never read /workspace/hermes-home
+
+src/z0int/legacy_import.py:70: ValueError
+____________________________ test_legacy_import_cli ____________________________
+
+tmp_path = PosixPath('/workspace/hermes-home/profiles/ayo/cache/scratch/pytest-of-kvn/pytest-0/test_legacy_import_cli0')
+spine = PosixPath('/workspace/hermes-home/profiles/ayo/cache/scratch/pytest-of-kvn/pytest-0/test_legacy_import_cli0/legacy/receipts')
+capsys = <_pytest.capture.CaptureFixture object at 0x7fcc87410e90>
+
+    def test_legacy_import_cli(tmp_path, spine, capsys):
+>       rc = li._main(['omp-v1', '--decisions', str(spine / 'decisions.jsonl'), '--outcomes', str(spine / 'outcomes.jsonl'),
+                       '--root', str(tmp_path / 'z0')])
+
+tests/test_legacy_import.py:326: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/z0int/legacy_import.py:331: in _main
+    man = import_omp_v1(args.decisions, args.outcomes, root=args.root)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src/z0int/legacy_import.py:188: in import_omp_v1
+    for _, row in run.lines(path, key):
+                  ^^^^^^^^^^^^^^^^^^^^
+src/z0int/legacy_import.py:100: in lines
+    path = _guard(path)
+           ^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+path = PosixPath('/workspace/hermes-home/profiles/ayo/cache/scratch/pytest-of-kvn/pytest-0/test_legacy_import_cli0/legacy/receipts/decisions.jsonl')
+
+    def _guard(path: Path) -> Path:
+        """Refuse a source under a live harness home before anything opens it. realpath resolves symlinks (lstat and
+        readlink only), so a link that points into the home is refused as well."""
+        p = os.path.abspath(os.path.expanduser(str(path)))
+        roots = {*REFUSED_ROOTS, *map(os.path.realpath, REFUSED_ROOTS)}
+        if any(q == r or q.startswith(r + '/') for q in (p, os.path.realpath(p)) for r in roots):
+>           raise ValueError(f'refusing to read {p}: legacy imports never read /workspace/hermes-home')
+E           ValueError: refusing to read /workspace/hermes-home/profiles/ayo/cache/scratch/pytest-of-kvn/pytest-0/test_legacy_import_cli0/legacy/receipts/decisions.jsonl: legacy imports never read /workspace/hermes-home
+
+src/z0int/legacy_import.py:70: ValueError
+_ test_legacy_table_manifest_names_its_label_source_not_an_agentsview_polarity _
+
+tmp_path = PosixPath('/workspace/hermes-home/profiles/ayo/cache/scratch/pytest-of-kvn/pytest-0/test_legacy_table_manifest_nam0')
+spine = PosixPath('/workspace/hermes-home/profiles/ayo/cache/scratch/pytest-of-kvn/pytest-0/test_legacy_table_manifest_nam0/legacy/receipts')
+
+    def test_legacy_table_manifest_names_its_label_source_not_an_agentsview_polarity(tmp_path, spine):
+        """omp/legacy rows are labelled by the OMP v1 effective tier, not by AgentsView shell exits."""
+        home = tmp_path / 'z0'
+>       li.import_omp_v1(spine / 'decisions.jsonl', spine / 'outcomes.jsonl', root=home)
+
+tests/test_legacy_import.py:334: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/z0int/legacy_import.py:188: in import_omp_v1
+    for _, row in run.lines(path, key):
+                  ^^^^^^^^^^^^^^^^^^^^
+src/z0int/legacy_import.py:100: in lines
+    path = _guard(path)
+           ^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+path = PosixPath('/workspace/hermes-home/profiles/ayo/cache/scratch/pytest-of-kvn/pytest-0/test_legacy_table_manifest_nam0/legacy/receipts/decisions.jsonl')
+
+    def _guard(path: Path) -> Path:
+        """Refuse a source under a live harness home before anything opens it. realpath resolves symlinks (lstat and
+        readlink only), so a link that points into the home is refused as well."""
+        p = os.path.abspath(os.path.expanduser(str(path)))
+        roots = {*REFUSED_ROOTS, *map(os.path.realpath, REFUSED_ROOTS)}
+        if any(q == r or q.startswith(r + '/') for q in (p, os.path.realpath(p)) for r in roots):
+>           raise ValueError(f'refusing to read {p}: legacy imports never read /workspace/hermes-home')
+E           ValueError: refusing to read /workspace/hermes-home/profiles/ayo/cache/scratch/pytest-of-kvn/pytest-0/test_legacy_table_manifest_nam0/legacy/receipts/decisions.jsonl: legacy imports never read /workspace/hermes-home
+
+src/z0int/legacy_import.py:70: ValueError
+_ test_tick_runs_the_steps_in_order_writes_the_summary_and_a_second_tick_adds_nothing _
+
+world = namespace(root=PosixPath('/workspace/hermes-home/profiles/ayo/cache/scratch/pytest-of-kvn/pytest-0/test_tick_runs_the_...=PosixPath('/workspace/hermes-home/profiles/ayo/cache/scratch/pytest-of-kvn/pytest-0/test_tick_runs_the_steps_in_or0'))
+learner = namespace(dir=PosixPath('/workspace/hermes-home/profiles/ayo/cache/scratch/pytest-of-kvn/pytest-0/test_tick_runs_the_s...-0/test_tick_runs_the_steps_in_or0/learner-calls.jsonl'), calls=<function learner.<locals>.<lambda> at 0x7fcc86fe3f60>)
+
+    def test_tick_runs_the_steps_in_order_writes_the_summary_and_a_second_tick_adds_nothing(world, learner):
+        turns(world.home, 'hermes', [('hs-1', 't1', 'verified_success', '2026-09-29'),
+                                     ('hs-2', 't2', 'verified_failure', '2026-09-30')])
+        cc_opportunities(world.home)
+        omp_v1_legacy(world.home)
+        first = tick(world)
+        assert [s['name'] for s in first['steps']] == STEPS
+>       assert [s['status'] for s in first['steps']] == ['done'] * len(STEPS)
+E       AssertionError: assert ['done', 'don..., 'done', ...] == ['done', 'don..., 'done', ...]
+E         
+E         At index 2 diff: 'error:ValueError' != 'done'
+E         Use -v to get more diff
+
+tests/test_loop_tick.py:186: AssertionError
+___ test_strata_are_learned_one_harness_x_cohort_at_a_time_and_legacy_never ____
+
+world = namespace(root=PosixPath('/workspace/hermes-home/profiles/ayo/cache/scratch/pytest-of-kvn/pytest-0/test_strata_are_lea...=PosixPath('/workspace/hermes-home/profiles/ayo/cache/scratch/pytest-of-kvn/pytest-0/test_strata_are_learned_one_ha0'))
+learner = namespace(dir=PosixPath('/workspace/hermes-home/profiles/ayo/cache/scratch/pytest-of-kvn/pytest-0/test_strata_are_lear...-0/test_strata_are_learned_one_ha0/learner-calls.jsonl'), calls=<function learner.<locals>.<lambda> at 0x7fcc86fe3e20>)
+
+    def test_strata_are_learned_one_harness_x_cohort_at_a_time_and_legacy_never(world, learner):
+        set_config(world.home, preregs={'claude-code': 'verified-loop-v0', 'omp': 'test-prereg'})
+        turns(world.home, 'omp', [('om-1', 't1', 'verified_success', '2026-09-30')])
+        turns(world.home, 'omp', [('om-2', 't2', 'verified_failure', '2026-09-30')], cohort='agent')
+        omp_v1_legacy(world.home)
+        cc_opportunities(world.home)
+        rep = tick(world)
+        calls = learner.calls()
+        assert all(len(c['strata']) == 1 for c in calls)
+        learned = sorted(tuple(c['strata'][0]) for c in calls)
+        assert learned == [('claude-code', 'unknown'), ('omp', 'agent'), ('omp', 'interactive')]
+>       assert rep['strata']['omp/legacy']['learn'] == 'not_learnable'
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       KeyError: 'omp/legacy'
+
+tests/test_loop_tick.py:282: KeyError
+______ test_the_import_step_stops_between_legacy_sources_at_the_deadline _______
+
+world = namespace(root=PosixPath('/workspace/hermes-home/profiles/ayo/cache/scratch/pytest-of-kvn/pytest-0/test_the_import_ste...=PosixPath('/workspace/hermes-home/profiles/ayo/cache/scratch/pytest-of-kvn/pytest-0/test_the_import_step_stops_bet0'))
+learner = namespace(dir=PosixPath('/workspace/hermes-home/profiles/ayo/cache/scratch/pytest-of-kvn/pytest-0/test_the_import_step...-0/test_the_import_step_stops_bet0/learner-calls.jsonl'), calls=<function learner.<locals>.<lambda> at 0x7fcc86fe7240>)
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7fcc86f470e0>
+
+    def test_the_import_step_stops_between_legacy_sources_at_the_deadline(world, learner, monkeypatch):
+        from z0int import legacy_import as li
+        omp_v1_legacy(world.home)
+        (world.home / 'shadow').mkdir(exist_ok=True)
+        (world.home / 'shadow' / 'cognition-shadow.jsonl').write_text('')
+        real, seen = li.import_omp_v1, []
+    
+        def slow(*a, **k):
+            seen.append('omp-v1')
+            time.sleep(1.5)
+            return real(*a, **k)
+        monkeypatch.setattr(li, 'import_omp_v1', slow)
+        monkeypatch.setattr(li, 'import_cognition_shadow', lambda *a, **k: seen.append('cognition') or {})
+        rep = tick(world, budget_s=1.0)
+        status = {s['name']: s['status'] for s in rep['steps']}
+>       assert status['import'] == 'partial' and seen == ['omp-v1']
+E       AssertionError: assert ('error:ValueError' == 'partial'
+E         
+E         - partial
+E         + error:ValueError)
+
+tests/test_loop_tick.py:411: AssertionError
+_ test_hook_processes_join_the_capture_opportunity_and_the_memory_receipt[claude-code] _
+
+env = PosixPath('/workspace/hermes-home/profiles/ayo/cache/scratch/pytest-of-kvn/pytest-0/test_hook_processes_join_the_c0')
+harness = 'claude-code'
+
+    @pytest.mark.parametrize('harness', ['claude-code', 'codex', 'grok'])
+    def test_hook_processes_join_the_capture_opportunity_and_the_memory_receipt(env, harness):
+        """The real UserPromptSubmit commands of one turn (capture + memory, separate processes): the detached
+        opportunity row carries the detached shadow receipt."""
+        task = env / 'z0'
+        p = {'session_id': f'sess-{harness}', 'prompt_id': 'p-1', 'prompt': QUERY, 'cwd': str(task),
+             'hook_event_name': 'UserPromptSubmit'}
+        procs = [subprocess.Popen([sys.executable, '-m', mod, '--harness', harness, 'prompt'], stdin=subprocess.PIPE,
+                                  stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+                 for mod in ('z0int.hook_adapter', 'z0int.memory.hook')]
+        for proc in procs:
+            proc.communicate(json.dumps(p), timeout=60)
+        opp = hc.state_dir(harness) / hc.RECORD_FILES['opportunity_record']
+        rows = wait_for(lambda: opp.exists() and [json.loads(x) for x in opp.read_text().splitlines() if x.strip()], 60)
+        assert rows and rows[0]['turn_key'] == turn_key(harness, p['session_id'], 'p-1')
+>       assert rows[0].get('memory'), f'{harness}: opportunity row has no memory receipt'
+E       AssertionError: claude-code: opportunity row has no memory receipt
+E       assert None
+E        +  where None = <built-in method get of dict object at 0x7fcc87231400>('memory')
+E        +    where <built-in method get of dict object at 0x7fcc87231400> = {'attempt_id': 0, 'capture': {'is_harness_message': False, 'request_chars': '1-49'}, 'cohort': 'interactive', 'gate': 'ACT', ...}.get
+
+tests/test_memory_capture_join.py:174: AssertionError
+___ DeploymentIdentityTests.test_valid_stamp_wins_and_mismatched_stamp_fails ___
+
+self = <test_orientation.DeploymentIdentityTests testMethod=test_valid_stamp_wins_and_mismatched_stamp_fails>
+
+    def test_valid_stamp_wins_and_mismatched_stamp_fails(self):
+        module = load('identity_generator', ROOT / 'scripts/state-packet/generate_packet.py')
+        with tempfile.TemporaryDirectory() as tmp:
+            sha = 'a' * 40
+            root = Path(tmp) / sha
+            child = root / 'omp-extensions/extension'
+            child.mkdir(parents=True)
+            stamp = root / 'DEPLOYED_SHA'
+            stamp.write_text(sha + '\n')
+            with patch.object(module, 'cmd', return_value=''):
+>               self.assertEqual(module.deployment_identity(child), (str(root), sha, 'content-stamped', str(stamp)))
+E               AssertionError: Tuples differ: ('/workspace/hermes-home/profiles/ayo/cache/[239 chars]SHA') != ('/home/kvn/.hermes/profiles/ayo/cache/scrat[229 chars]SHA')
+E               
+E               First differing element 0:
+E               '/workspace/hermes-home/profiles/ayo/cache/[56 chars]aaaa'
+E               '/home/kvn/.hermes/profiles/ayo/cache/scrat[51 chars]aaaa'
+E               
+E               - ('/workspace/hermes-home/profiles/ayo/cache/scratch/tmpum1o5fm6/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+E               ?    ^ ^^^^^^        -----
+E               
+E               + ('/home/kvn/.hermes/profiles/ayo/cache/scratch/tmpum1o5fm6/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+E               ?    ^ ^  +++++
+E               
+E                  'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+E                  'content-stamped',
+E               -  '/workspace/hermes-home/profiles/ayo/cache/scratch/tmpum1o5fm6/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/DEPLOYED_SHA')
+E               ?    ^ ^^^^^^        -----
+E               
+E               +  '/home/kvn/.hermes/profiles/ayo/cache/scratch/tmpum1o5fm6/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/DEPLOYED_SHA')
+E               ?    ^ ^  +++++
+
+tests/test_orientation.py:38: AssertionError
+_ OrientationTests.test_stamped_installer_preserves_unrelated_hooks_and_backup _
+
+self = <test_orientation.OrientationTests testMethod=test_stamped_installer_preserves_unrelated_hooks_and_backup>
+
+    def test_stamped_installer_preserves_unrelated_hooks_and_backup(self):
+        home = Path(self.tmp.name) / 'home'
+        repo = Path(self.tmp.name) / 'committed-source'
+        for relative in ('src/z0int/orientation.py', 'scripts/state-packet/generate_packet.py',
+                         'omp-extensions/z0-state-packet/index.ts', 'harness-adapters/hermes-state-packet/__init__.py',
+                         'harness-adapters/hermes-state-packet/plugin.yaml', 'bin/generate-packet',
+                         'bin/state-packet-hook', 'scripts/install-state-packet.py'):
+            target = repo / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(ROOT / relative, target)
+        subprocess.run(['git', 'init', '-q', str(repo)], check=True)
+        subprocess.run(['git', '-C', str(repo), 'add', '.'], check=True)
+        subprocess.run(['git', '-C', str(repo), '-c', 'user.name=Test', '-c', 'user.email=test@example.invalid',
+                        'commit', '-qm', 'fixture'], check=True)
+        settings = home / '.claude/settings.json'
+        settings.parent.mkdir(parents=True)
+        settings.write_text(json.dumps({'hooks': {'UserPromptSubmit': [
+            {'hooks': [{'type': 'command', 'command': 'unrelated-hook'}]}]}}))
+        result = subprocess.run([sys.executable, str(repo / 'scripts/install-state-packet.py'), '--home', str(home)],
+            text=True, capture_output=True, check=True)
+        receipt = json.loads(result.stdout)
+        install = Path(receipt['install'])
+        self.assertTrue(install.is_dir())
+        self.assertFalse(install.is_symlink())
+        extension = home / '.omp/agent/extensions/z0-state-packet'
+>       self.assertEqual(extension.resolve(), install / 'omp-extensions/z0-state-packet')
+E       AssertionError: PosixPath('/workspace/hermes-home/profiles/ayo/cache/[120 chars]ket') != PosixPath('/home/kvn/.hermes/profiles/ayo/cache/scrat[115 chars]ket')
+
+tests/test_orientation.py:125: AssertionError
+________________________ PathsLayout.test_ensure_layout ________________________
+
+self = <test_z0int_onboard.PathsLayout testMethod=test_ensure_layout>
+
+    def test_ensure_layout(self):
+        from z0int.paths import ensure_layout
+    
+        with tempfile.TemporaryDirectory() as tmp:
+            layout = ensure_layout(Path(tmp))
+            self.assertTrue((Path(tmp) / "state").is_dir())
+            self.assertTrue((Path(tmp) / "episodes").is_dir())
+>           self.assertEqual(layout["root"], Path(tmp).resolve())
+E           AssertionError: PosixPath('/home/kvn/.hermes/profiles/ayo/cache/scratch/tmpq85gsu9c') != PosixPath('/workspace/hermes-home/profiles/ayo/cache/scratch/tmpq85gsu9c')
+
+tests/test_z0int_onboard.py:17: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_aodl_admission.py::AodlAdmissionTests::test_real_aodl_contract_api
+FAILED tests/test_aodl_observation.py::test_drift_projects_stateupdate_without_mutating_intent
+FAILED tests/test_aodl_observation.py::test_drift_replay_is_idempotent_for_event_and_receipt
+FAILED tests/test_aodl_observation.py::test_invalid_contract_fails_before_observation_receipt
+FAILED tests/test_aodl_observation.py::test_project_drift_supports_causal_parents_without_reordering_intent
+FAILED tests/test_aodl_observation.py::test_concurrent_drift_records_one_canonical_receipt
+FAILED tests/test_dispatch_authority.py::test_protocol_v3_allow_is_fsynced_before_dispatch_start
+FAILED tests/test_dispatch_authority.py::test_protocol_v3_projects_gate_latency_once_to_tokenomics
+FAILED tests/test_dispatch_authority.py::test_protocol_v3_denied_budget_never_creates_dispatch
+FAILED tests/test_dispatch_authority.py::test_restart_reuses_allowed_admission_before_dispatch_start
+FAILED tests/test_dispatch_authority.py::test_runtime_semantic_drift_does_not_rewrite_intent_lineage
+FAILED tests/test_file_search.py::FileSearchTests::test_ceiling_conservatively_counts_caches_and_nested_repositories
+FAILED tests/test_golden_canary_wrapper.py::test_valid_preflight_reaches_live_proof_only_after_checks
+FAILED tests/test_governed_worker.py::test_checked_in_contract_is_valid_and_builds_protocol_v3_request
+FAILED tests/test_governed_worker.py::test_explicit_governed_provider_must_have_zero_cost_evidence
+FAILED tests/test_governed_worker.py::test_unknown_attempted_token_usage_blocks_next_spawn
+FAILED tests/test_governed_worker.py::test_prepare_freezes_governance_but_not_task_context
+FAILED tests/test_governed_worker.py::test_prepare_same_trace_different_caller_request_conflicts
+FAILED tests/test_governed_worker.py::test_execute_forwards_same_trace_and_host_built_envelope
+FAILED tests/test_governed_worker.py::test_remote_executor_result_carries_root_trace_and_admission
+FAILED tests/test_hermes_adapter.py::HermesAdapterTests::test_repository_context_uses_shared_packet_and_event_log
+FAILED tests/test_hermes_optchat.py::test_on_injects_prior_view_registers_tools_and_uses_a_hermes_local_root
+FAILED tests/test_hermes_optchat.py::test_tool_and_result_appends_do_not_block_the_hot_hook
+FAILED tests/test_hermes_optchat.py::test_shadow_records_but_is_not_model_visible
+FAILED tests/test_hermes_optchat.py::test_shadow_disables_compaction_even_when_omp_is_enabled
+FAILED tests/test_hook_adapter.py::test_hook_subprocess_wall_time_is_within_bare_python_plus_40ms
+FAILED tests/test_intelligence_service.py::test_health_and_bounded_admission
+FAILED tests/test_legacy_import.py::test_omp_v1_spine_imports_gold_and_negative_tiers_as_the_only_labels
+FAILED tests/test_legacy_import.py::test_omp_v1_rerun_adds_zero_rows_and_keeps_the_manifest
+FAILED tests/test_legacy_import.py::test_cognition_shadow_keeps_served_answers_only
+FAILED tests/test_legacy_import.py::test_cognition_import_prefers_structured_identity_without_prompt_text[identity0]
+FAILED tests/test_legacy_import.py::test_cognition_import_prefers_structured_identity_without_prompt_text[identity1]
+FAILED tests/test_legacy_import.py::test_dsh_jev_receipts_become_legacy_shadow_decisions_never_gold
+FAILED tests/test_legacy_import.py::test_dsh_importer_never_reads_hermes_home
+FAILED tests/test_legacy_import.py::test_dsh_jev_orphan_decision_never_stalls_the_import
+FAILED tests/test_legacy_import.py::test_dsh_jev_orphan_that_is_no_longer_the_tail_is_imported
+FAILED tests/test_legacy_import.py::test_scrub_correction_leaves_one_row_per_turn_with_the_corrected_label
+FAILED tests/test_legacy_import.py::test_shadow_tables_keep_the_latest_row_per_decision
+FAILED tests/test_legacy_import.py::test_every_importer_is_idempotent_by_watermark
+FAILED tests/test_legacy_import.py::test_new_tables_refuse_text_keys - ValueE...
+FAILED tests/test_legacy_import.py::test_legacy_import_cli - ValueError: refu...
+FAILED tests/test_legacy_import.py::test_legacy_table_manifest_names_its_label_source_not_an_agentsview_polarity
+FAILED tests/test_loop_tick.py::test_tick_runs_the_steps_in_order_writes_the_summary_and_a_second_tick_adds_nothing
+FAILED tests/test_loop_tick.py::test_strata_are_learned_one_harness_x_cohort_at_a_time_and_legacy_never
+FAILED tests/test_loop_tick.py::test_the_import_step_stops_between_legacy_sources_at_the_deadline
+FAILED tests/test_memory_capture_join.py::test_hook_processes_join_the_capture_opportunity_and_the_memory_receipt[claude-code]
+FAILED tests/test_orientation.py::DeploymentIdentityTests::test_valid_stamp_wins_and_mismatched_stamp_fails
+FAILED tests/test_orientation.py::OrientationTests::test_stamped_installer_preserves_unrelated_hooks_and_backup
+FAILED tests/test_z0int_onboard.py::PathsLayout::test_ensure_layout - Asserti...
+49 failed, 2242 passed, 12 skipped, 5 deselected, 1 xfailed in 667.72s (0:11:07)

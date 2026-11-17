@@ -1,0 +1,3613 @@
+{
+ "total": 213,
+ "dead": [],
+ "all": [
+  {
+   "module": "openjev_phase1",
+   "file": "src/openjev_phase1/__init__.py",
+   "importers": [],
+   "nonpy": [
+    "README.md",
+    "THIRD_PARTY.md",
+    "benchmarks/claude_code/tasks/backend-review/task.json",
+    "docs/backends.md",
+    "docs/evolution-lab.md",
+    "docs/intelligence-reconciliation.tsv",
+    "docs/jevlike-trainable-route.md",
+    "pyproject.toml",
+    "scripts/setup-flyforge.sh",
+    "third_party/aodl_a848270/README.md"
+   ],
+   "dead": false
+  },
+  {
+   "module": "openjev_phase1.cli",
+   "file": "src/openjev_phase1/cli.py",
+   "importers": [],
+   "nonpy": [
+    "docs/intelligence-reconciliation.tsv",
+    "pyproject.toml"
+   ],
+   "dead": false
+  },
+  {
+   "module": "openjev_phase1.core",
+   "file": "src/openjev_phase1/core.py",
+   "importers": [
+    "benchmarks/decision_vs_generation.py",
+    "benchmarks/shape777.py",
+    "benchmarks/shape777_reranker.py",
+    "omp-extensions/openjev-06b/worker.py",
+    "omp-extensions/openjev/worker.py",
+    "src/openjev_phase1/cli.py",
+    "src/openjev_phase1/direct.py",
+    "src/openjev_phase1/reranker.py",
+    "src/openjev_phase1/serial.py",
+    "src/openjev_phase1/shared.py",
+    "src/openjev_phase1/vllm_route/score.py",
+    "src/openjev_phase1/vllm_route/template.py",
+    "src/z0int/backends/openjev_direct.py",
+    "tests/test_core.py"
+   ],
+   "nonpy": [
+    "docs/intelligence-reconciliation.tsv"
+   ],
+   "dead": false
+  },
+  {
+   "module": "openjev_phase1.direct",
+   "file": "src/openjev_phase1/direct.py",
+   "importers": [
+    "benchmarks/shape777.py",
+    "omp-extensions/openjev-06b/worker.py",
+    "omp-extensions/openjev/worker.py",
+    "src/openjev_phase1/cli.py",
+    "src/openjev_phase1/serial.py",
+    "src/openjev_phase1/shared.py",
+    "src/z0int/backends/openjev_direct.py"
+   ],
+   "nonpy": [
+    "docs/backends.md",
+    "docs/intelligence-reconciliation.tsv"
+   ],
+   "dead": false
+  },
+  {
+   "module": "openjev_phase1.jevlike",
+   "file": "src/openjev_phase1/jevlike/__init__.py",
+   "importers": [],
+   "nonpy": [
+    "benchmarks/claude_code/tasks/backend-review/task.json",
+    "docs/intelligence-reconciliation.tsv",
+    "docs/jevlike-trainable-route.md",
+    "pyproject.toml",
+    "third_party/aodl_a848270/README.md"
+   ],
+   "dead": false
+  },
+  {
+   "module": "openjev_phase1.jevlike.bridge",
+   "file": "src/openjev_phase1/jevlike/bridge.py",
+   "importers": [],
+   "nonpy": [
+    "docs/intelligence-reconciliation.tsv",
+    "docs/jevlike-trainable-route.md",
+    "pyproject.toml"
+   ],
+   "dead": false
+  },
+  {
+   "module": "openjev_phase1.jevlike.data",
+   "file": "src/openjev_phase1/jevlike/data.py",
+   "importers": [
+    "src/openjev_phase1/jevlike/bridge.py",
+    "src/openjev_phase1/jevlike/eval.py",
+    "src/openjev_phase1/jevlike/model.py",
+    "src/openjev_phase1/jevlike/predict.py",
+    "src/openjev_phase1/jevlike/train.py",
+    "tests/test_jevlike_smoke.py"
+   ],
+   "nonpy": [
+    "benchmarks/julia_claims/README.md",
+    "docs/intelligence-reconciliation.tsv",
+    "pyproject.toml",
+    "results/julia-claims/adapter-typed-full-summary.json"
+   ],
+   "dead": false
+  },
+  {
+   "module": "openjev_phase1.jevlike.eval",
+   "file": "src/openjev_phase1/jevlike/eval.py",
+   "importers": [],
+   "nonpy": [
+    "docs/intelligence-reconciliation.tsv",
+    "examples/jevlike/chess/README.md",
+    "pyproject.toml"
+   ],
+   "dead": false
+  },
+  {
+   "module": "openjev_phase1.jevlike.model",
+   "file": "src/openjev_phase1/jevlike/model.py",
+   "importers": [
+    "src/openjev_phase1/jevlike/bridge.py",
+    "src/openjev_phase1/jevlike/eval.py",
+    "src/openjev_phase1/jevlike/predict.py",
+    "src/openjev_phase1/jevlike/train.py",
+    "src/openjev_phase1/jevlike/vision.py",
+    "tests/test_jevlike_smoke.py"
+   ],
+   "nonpy": [
+    "docs/intelligence-reconciliation.tsv"
+   ],
+   "dead": false
+  },
+  {
+   "module": "openjev_phase1.jevlike.predict",
+   "file": "src/openjev_phase1/jevlike/predict.py",
+   "importers": [],
+   "nonpy": [
+    "docs/intelligence-reconciliation.tsv",
+    "pyproject.toml"
+   ],
+   "dead": false
+  },
+  {
+   "module": "openjev_phase1.jevlike.train",
+   "file": "src/openjev_phase1/jevlike/train.py",
+   "importers": [
+    "src/openjev_phase1/jevlike/bridge.py",
+    "src/openjev_phase1/jevlike/eval.py",
+    "src/openjev_phase1/jevlike/predict.py"
+   ],
+   "nonpy": [
+    "docs/intelligence-reconciliation.tsv",
+    "docs/network-cutover-finish-report.md",
+    "examples/jevlike/chess/README.md",
+    "pyproject.toml"
+   ],
+   "dead": false
+  },
+  {
+   "module": "openjev_phase1.jevlike.vision",
+   "file": "src/openjev_phase1/jevlike/vision.py",
+   "importers": [
+    "examples/jevlike/chess/eval.py",
+    "examples/jevlike/chess/play.py",
+    "examples/jevlike/chess/test_smoke.py",
+    "examples/jevlike/chess/train.py",
+    "examples/jevlike/doom/audit.py",
+    "examples/jevlike/doom/play.py",
+    "examples/jevlike/doom/test_smoke.py",
+    "examples/jevlike/doom/train_dagger.py",
+    "examples/jevlike/doom/train_imitation.py",
+    "examples/jevlike/doom/train_joint.py",
+    "examples/jevlike/doom/train_joint_ppo.py",
+    "examples/jevlike/doom/train_ppo.py"
+   ],
+   "nonpy": [
+    "docs/intelligence-reconciliation.tsv"
+   ],
+   "dead": false
+  },
+  {
+   "module": "openjev_phase1.reranker",
+   "file": "src/openjev_phase1/reranker.py",
+   "importers": [
+    "benchmarks/shape777_reranker.py",
+    "src/openjev_phase1/cli.py",
+    "tests/test_reranker.py"
+   ],
+   "nonpy": [
+    "docs/intelligence-reconciliation.tsv"
+   ],
+   "dead": false
+  },
+  {
+   "module": "openjev_phase1.serial",
+   "file": "src/openjev_phase1/serial.py",
+   "importers": [
+    "benchmarks/shape777.py",
+    "src/openjev_phase1/cli.py",
+    "tests/test_serial.py"
+   ],
+   "nonpy": [
+    "docs/intelligence-reconciliation.tsv"
+   ],
+   "dead": false
+  },
+  {
+   "module": "openjev_phase1.shared",
+   "file": "src/openjev_phase1/shared.py",
+   "importers": [
+    "benchmarks/decision_vs_generation.py",
+    "benchmarks/shape777.py",
+    "src/openjev_phase1/cli.py",
+    "tests/test_shared.py"
+   ],
+   "nonpy": [
+    "docs/intelligence-reconciliation.tsv"
+   ],
+   "dead": false
+  },
+  {
+   "module": "openjev_phase1.vllm_route",
+   "file": "src/openjev_phase1/vllm_route/__init__.py",
+   "importers": [
+    "src/openjev_phase1/cli.py"
+   ],
+   "nonpy": [
+    "benchmarks/claude_code/tasks/backend-review/task.json",
+    "docs/intelligence-reconciliation.tsv",
+    "third_party/aodl_a848270/README.md"
+   ],
+   "dead": false
+  },
+  {
+   "module": "openjev_phase1.vllm_route.client",
+   "file": "src/openjev_phase1/vllm_route/client.py",
+   "importers": [
+    "src/openjev_phase1/vllm_route/score.py",
+    "tests/test_vllm_route.py"
+   ],
+   "nonpy": [
+    "docs/intelligence-reconciliation.tsv"
+   ],
+   "dead": false
+  },
+  {
+   "module": "openjev_phase1.vllm_route.config",
+   "file": "src/openjev_phase1/vllm_route/config.py",
+   "importers": [
+    "src/openjev_phase1/vllm_route/client.py",
+    "src/openjev_phase1/vllm_route/score.py",
+    "tests/test_vllm_route.py"
+   ],
+   "nonpy": [
+    "docs/intelligence-reconciliation.tsv"
+   ],
+   "dead": false
+  },
+  {
+   "module": "openjev_phase1.vllm_route.score",
+   "file": "src/openjev_phase1/vllm_route/score.py",
+   "importers": [
+    "tests/test_vllm_route.py"
+   ],
+   "nonpy": [
+    "docs/intelligence-reconciliation.tsv"
+   ],
+   "dead": false
+  },
+  {
+   "module": "openjev_phase1.vllm_route.template",
+   "file": "src/openjev_phase1/vllm_route/template.py",
+   "importers": [
+    "src/openjev_phase1/vllm_route/score.py",
+    "tests/test_vllm_route.py"
+   ],
+   "nonpy": [
+    "docs/intelligence-reconciliation.tsv"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int",
+   "file": "src/z0int/__main__.py",
+   "importers": [
+    "benchmarks/bend_gate_parity.py",
+    "scripts/prove-intelligence.py",
+    "src/z0int/autoresearch/resources.py",
+    "src/z0int/autoresearch/store.py",
+    "src/z0int/backends/julia.py",
+    "src/z0int/backends/llama_http.py",
+    "src/z0int/backends/nanojev.py",
+    "src/z0int/bridge/generation.py",
+    "src/z0int/bridge/runtime.py",
+    "src/z0int/capabilities/context_project_state.py",
+    "src/z0int/cli.py",
+    "tests/test_agentsview_ro.py",
+    "tests/test_agentweb_bridge.py",
+    "tests/test_agentweb_integration.py",
+    "tests/test_ao_experiment.py",
+    "tests/test_ao_report.py",
+    "tests/test_backend_contract.py",
+    "tests/test_bend_gate.py",
+    "tests/test_cc_export_regression.py",
+    "tests/test_check_class.py",
+    "tests/test_claude_code_adapter.py",
+    "tests/test_claude_code_engagement.py",
+    "tests/test_claude_code_launch.py",
+    "tests/test_claude_code_obs.py",
+    "tests/test_claude_code_tokenomics.py",
+    "tests/test_decision_opportunity.py",
+    "tests/test_dispatch_authority.py",
+    "tests/test_dsh_capture.py",
+    "tests/test_file_search.py",
+    "tests/test_free_fanout.py",
+    "tests/test_free_only.py",
+    "tests/test_governed_worker.py",
+    "tests/test_harness_capture.py",
+    "tests/test_hermes_capture.py",
+    "tests/test_hermes_decisions.py",
+    "tests/test_hook_adapter.py",
+    "tests/test_hot_path.py",
+    "tests/test_integrate_wiring.py",
+    "tests/test_intelligence.py",
+    "tests/test_intelligence_canonical.py",
+    "tests/test_intelligence_service.py",
+    "tests/test_legacy_import.py",
+    "tests/test_loop_data_sources.py",
+    "tests/test_loop_export.py",
+    "tests/test_loop_tables.py",
+    "tests/test_loop_tick.py",
+    "tests/test_memory_capture_join.py",
+    "tests/test_memory_mcp_backends.py",
+    "tests/test_memory_mcp_profile.py",
+    "tests/test_memory_receipt_binding.py",
+    "tests/test_memory_scrub.py",
+    "tests/test_memory_seam.py",
+    "tests/test_memory_surface.py",
+    "tests/test_network_cutover_phase_a.py",
+    "tests/test_omp_capture.py",
+    "tests/test_orientation.py",
+    "tests/test_outcome_verifier.py",
+    "tests/test_posture.py",
+    "tests/test_posture_routing.py",
+    "tests/test_provider_saturation.py",
+    "tests/test_quota_budget.py",
+    "tests/test_shadow_learning.py",
+    "tests/test_shadow_slot.py",
+    "tests/test_shared_file_search.py",
+    "tests/test_sidestep_free_only.py",
+    "tests/test_state_packet.py",
+    "tests/test_suite_isolation.py",
+    "tests/test_turn_key.py",
+    "tests/test_turn_readers.py",
+    "tests/test_utilization.py",
+    "tests/test_verification_density.py",
+    "tests/test_verify_harness.py",
+    "tests/test_worker_routing.py",
+    "tests/test_worker_routing_host_override.py",
+    "tests/test_z0int_onboard.py"
+   ],
+   "nonpy": [
+    ".agents/plugins/marketplace.json",
+    ".claude-plugin/marketplace.json",
+    ".verified-oss-loop/inventory.yml",
+    "AGENTS.md",
+    "CLAUDE.md",
+    "README.md",
+    "ROADMAP.md",
+    "THIRD_PARTY.md",
+    "adapters/hermes-z0int/README.md",
+    "benchmarks/claude_code/failure_injection.sh",
+    "benchmarks/claude_code/tasks/add-feature/task.json",
+    "benchmarks/claude_code/tasks/backend-review/task.json",
+    "benchmarks/claude_code/tasks/debug-suite/task.json",
+    "benchmarks/claude_code/tasks/grep-answer/task.json",
+    "benchmarks/claude_code/tasks/nav-harness/task.json",
+    "benchmarks/claude_code/tasks/repo-audit/task.json",
+    "benchmarks/claude_code/tasks/suite-full/task.json",
+    "benchmarks/claude_code/tasks/suite-triage/task.json",
+    "benchmarks/decision_opportunity/results_falsification_v0.json",
+    "benchmarks/decision_opportunity/results_selective_autonomy_v0.json",
+    "benchmarks/fixtures/decision-capability-v1/examples.jsonl",
+    "benchmarks/fixtures/mutation-retry-v0/examples.jsonl",
+    "benchmarks/image-jev-bench/README.md",
+    "benchmarks/julia_claims/README.md",
+    "benchmarks/julia_claims/frozen_config.json",
+    "benchmarks/state_packet/injection.json",
+    "benchmarks/state_packet/questions.json",
+    "benchmarks/state_packet/questions_holdout.json",
+    "benchmarks/state_packet/questions_pinned.json",
+    "benchmarks/state_packet/results_pinned.json",
+    "benchmarks/state_packet/results_pinned_haiku.json",
+    "benchmarks/state_packet/results_postfix.json",
+    "benchmarks/state_packet/results_s2.json",
+    "benchmarks/state_packet/results_v0.json",
+    "bend/aodl_gate/LAWS.bend",
+    "bend/aodl_gate/README.md",
+    "bend/aodl_gate/core.bend",
+    "bend/aodl_gate/transition.bend",
+    "bin/state-packet-hook",
+    "contracts/aodl/governed-worker-v1.json",
+    "deploy/executor/Dockerfile",
+    "deploy/k8s/intelligence-executor.yaml",
+    "deploy/k8s/intelligence-host-service.yaml",
+    "deploy/lab/README.md",
+    "deploy/lab/up",
+    "deploy/systemd/service.env.governed-example",
+    "deploy/systemd/z0-cognition.service",
+    "deploy/systemd/z0-slm.service",
+    "deploy/systemd/z0int-loop-tick.service",
+    "deploy/systemd/z0int-loop-tick.timer",
+    "deploy/systemd/z0intelligence.service",
+    "docs/ONBOARDING.md",
+    "docs/RESEARCH.md",
+    "docs/SCIENCE_CLAIMS.md",
+    "docs/abab-loop.md",
+    "docs/agentweb-bridge-protocol-v1.md",
+    "docs/agentweb-emma-integration.md",
+    "docs/aodl-admission.md",
+    "docs/aodl-governed-worker.md",
+    "docs/aodl-integration.md",
+    "docs/aodl-observation.md",
+    "docs/backends.md",
+    "docs/brand.md",
+    "docs/bridge-hot-reload.md",
+    "docs/cascade-compiler.md",
+    "docs/claude-code.md",
+    "docs/contrastive-evidence.md",
+    "docs/critical-path-phase0.md",
+    "docs/decision-capability-v2-plan.md",
+    "docs/decision-opportunity.md",
+    "docs/dispatch-authority.md",
+    "docs/evolution-lab.md",
+    "docs/file-search.md",
+    "docs/intelligence-layer.md",
+    "docs/intelligence-operations.md",
+    "docs/intelligence-reconciliation.tsv",
+    "docs/julia-decision-model.md",
+    "docs/local-cognition-omp-shadow.md",
+    "docs/local-cognition-portfolio.md",
+    "docs/memory-control-plane-contract.md",
+    "docs/network-cutover-finish-report.md",
+    "docs/network-cutover-harness.md",
+    "docs/network-cutover-phase-a.md",
+    "docs/observer-evaluation.md",
+    "docs/os-episode-compiler.md",
+    "docs/phase1b-decision-artifact.md",
+    "docs/phase1b-measurement-campaign.md",
+    "docs/pr-reconciliation-2026-10-02.md",
+    "docs/resource-posture.md",
+    "docs/rfc/agentweb-z0-bridge-v1.md",
+    "docs/routine-compiler.md",
+    "docs/routine-repair.md",
+    "docs/utilization.md",
+    "docs/verified-oss-loop.md",
+    "docs/worker-activity.md",
+    "examples/aodl/routine-cascade.json",
+    "harness-adapters/automatic-client.mjs",
+    "harness-adapters/claude-code-z0-obspack/bin/z0obs",
+    "harness-adapters/claude-code-z0-obspack/hooks/hooks.json",
+    "harness-adapters/claude-code-z0intelligence/.claude-plugin/plugin.json",
+    "harness-adapters/claude-code-z0intelligence/.mcp.json",
+    "harness-adapters/claude-code-z0intelligence/README.md",
+    "harness-adapters/claude-code-z0intelligence/bin/z0int-mcp",
+    "harness-adapters/claude-code-z0intelligence/hooks/hooks.json",
+    "harness-adapters/codex-z0intelligence/.codex-plugin/plugin.json",
+    "harness-adapters/codex-z0intelligence/.mcp.json",
+    "harness-adapters/codex-z0intelligence/README.md",
+    "harness-adapters/codex-z0intelligence/hooks/hooks.json",
+    "harness-adapters/dsh-z0intelligence/README.md",
+    "harness-adapters/dsh-z0intelligence/capture.mjs",
+    "harness-adapters/dsh-z0intelligence/index.mjs",
+    "harness-adapters/dsh-z0intelligence/lineage.mjs",
+    "harness-adapters/dsh-z0intelligence/memory.mjs",
+    "harness-adapters/dsh-z0intelligence/package.json",
+    "harness-adapters/dsh-z0intelligence/shadow.mjs",
+    "harness-adapters/dsh-z0intelligence/z0-memory.cordis.yml",
+    "harness-adapters/grok-z0intelligence/README.md",
+    "harness-adapters/grok-z0intelligence/hooks/z0-capture.json",
+    "harness-adapters/grok-z0intelligence/hooks/z0-memory.json",
+    "harness-adapters/grok-z0intelligence/mcp/z0-memory.toml",
+    "harness-adapters/hermes-file-search/README.md",
+    "harness-adapters/hermes-file-search/plugin.yaml",
+    "harness-adapters/hermes-z0intelligence/README.md",
+    "harness-adapters/hermes-z0intelligence/plugin.yaml",
+    "harness-adapters/memory-client.mjs",
+    "manifests/capabilities.v1.json",
+    "manifests/local_cognition.v1.json",
+    "manifests/memory-mcp-readonly.json",
+    "manifests/models.yaml",
+    "manifests/models.z0int.json",
+    "manifests/worker_routing.v1.json",
+    "omp-extensions/flyforge-jev/index.ts",
+    "omp-extensions/local-cognition/README.md",
+    "omp-extensions/local-cognition/index.test.ts",
+    "omp-extensions/local-cognition/index.ts",
+    "omp-extensions/local-cognition/package.json",
+    "omp-extensions/local-cognition/shadow.real-omp.test.ts",
+    "omp-extensions/openjev-06b/index.ts",
+    "omp-extensions/openjev/index.ts",
+    "omp-extensions/z0-memory/README.md",
+    "omp-extensions/z0-memory/index.test.ts",
+    "omp-extensions/z0-memory/index.ts",
+    "omp-extensions/z0-memory/mcp.json",
+    "omp-extensions/z0-memory/omo.ts",
+    "omp-extensions/z0-obspack/index.ts",
+    "omp-extensions/z0-optchat/index.ts",
+    "omp-extensions/z0-optchat/turn.ts",
+    "omp-extensions/z0-state-packet/index.ts",
+    "omp-extensions/z0-usage/index.test.ts",
+    "omp-extensions/z0-usage/index.ts",
+    "omp-extensions/z0int-bridge/index.test.ts",
+    "omp-extensions/z0int-bridge/index.ts",
+    "omp-extensions/z0int-bridge/omo.test.ts",
+    "omp-extensions/z0int-bridge/omo.ts",
+    "omp-extensions/z0int-intelligence/index.ts",
+    "operations/shadow-learner/deploy-proposed.sh",
+    "pyproject.toml",
+    "results/decision-backends/20260930-mbp-dcv1.stdout.json",
+    "results/decision-backends/20260930-mbp-dcv1/analytics.json",
+    "results/decision-backends/20260930-mbp-dcv1/bootstrap.json",
+    "results/decision-backends/20260930-mbp-dcv1/coverage.json",
+    "results/decision-backends/20260930-mbp-dcv1/raw.jsonl",
+    "results/decision-backends/20260930-mbp-dcv1/router.log",
+    "results/decision-backends/20260930-mbp-dcv1/run-manifest.json",
+    "results/decision-backends/20260930-mbp-dcv1/summary.json",
+    "results/decision-backends/20260930-mbp-dcv1/tokenomics-events.jsonl",
+    "results/decision-backends/20260930-mbp-dcv1/uncertainty.json",
+    "results/decision-backends/20260930-mbp-tfs-sealed77.stdout.json",
+    "results/decision-backends/20260930-mbp-tfs-sealed77/analytics.json",
+    "results/decision-backends/20260930-mbp-tfs-sealed77/bootstrap.json",
+    "results/decision-backends/20260930-mbp-tfs-sealed77/coverage.json",
+    "results/decision-backends/20260930-mbp-tfs-sealed77/raw.jsonl",
+    "results/decision-backends/20260930-mbp-tfs-sealed77/router.log",
+    "results/decision-backends/20260930-mbp-tfs-sealed77/run-manifest.json",
+    "results/decision-backends/20260930-mbp-tfs-sealed77/summary.json",
+    "results/decision-backends/20260930-mbp-tfs-sealed77/tokenomics-events.jsonl",
+    "results/decision-backends/20260930-mbp-tfs-sealed77/uncertainty.json",
+    "results/julia-claims/capability-tool_family_select.contract.json",
+    "results/julia-claims/decision-dataset-v2/inventory.json",
+    "schemas/agentweb-z0-bridge.v1.schema.json",
+    "scripts/bench-host-roster.sh",
+    "scripts/bootstrap.sh",
+    "scripts/check-intelligence-omp.mjs",
+    "scripts/e2e_spine.sh",
+    "scripts/hermes-decisions-sandbox/drive.sh",
+    "scripts/prove-governed-omp-tool.mjs",
+    "scripts/prove-intelligence-omp.mjs",
+    "scripts/prove-optchat-conformance.mjs",
+    "scripts/prove-optchat-sonnet.mjs",
+    "scripts/setup-flyforge.sh",
+    "scripts/setup-julia.sh",
+    "scripts/stage-z0int-release.sh",
+    "scripts/switch-z0int-release.sh",
+    "scripts/verify-one-live-copy.sh",
+    "scripts/with-gguf-router.sh",
+    "skills/z0int-onboard/SKILL.md",
+    "skills/z0int-repair-routine/SKILL.md",
+    "tests/fixtures/cc_export_6fee859.json",
+    "tests/fixtures/decision_request.json",
+    "tests/fixtures/nanojev_request.json",
+    "tests/fixtures/tokenomics-bench-parity/four-way/MANIFEST.json",
+    "tests/fixtures/tokenomics-bench-parity/four-way/raw.jsonl",
+    "tests/fixtures/tokenomics-bench-parity/four-way/summary.json",
+    "tests/fixtures/z0evals-fb14919/cohort.json",
+    "tests/fixtures/z0evals-fb14919/receipt.schema.json",
+    "tests/test-dsh-memory.mjs",
+    "tests/test-dsh-plugin.mjs",
+    "zer0.repo.yaml"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.abab",
+   "file": "src/z0int/abab.py",
+   "importers": [
+    "examples/refinement/demo.py",
+    "src/z0int/cli.py",
+    "tests/test_z0int_abab.py"
+   ],
+   "nonpy": [
+    "README.md",
+    "docs/intelligence-reconciliation.tsv"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.agentsview_ro",
+   "file": "src/z0int/agentsview_ro.py",
+   "importers": [
+    "tests/test_agentsview_ro.py",
+    "tests/test_loop_data_sources.py",
+    "tests/test_memory_receipt_binding.py",
+    "tests/test_memory_surface.py",
+    "tests/test_suite_isolation.py"
+   ],
+   "nonpy": [],
+   "dead": false
+  },
+  {
+   "module": "z0int.agentweb_bridge",
+   "file": "src/z0int/agentweb_bridge.py",
+   "importers": [
+    "src/z0int/intelligence_service.py",
+    "tests/test_agentweb_bridge.py",
+    "tests/test_intelligence_service.py"
+   ],
+   "nonpy": [
+    "docs/agentweb-bridge-protocol-v1.md",
+    "docs/rfc/agentweb-z0-bridge-v1.md",
+    "zer0.repo.yaml"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.agentweb_bridge_capabilities",
+   "file": "src/z0int/agentweb_bridge_capabilities.py",
+   "importers": [
+    "src/z0int/intelligence_service.py",
+    "tests/test_agentweb_bridge_capabilities.py",
+    "tests/test_agentweb_bridge_overload.py"
+   ],
+   "nonpy": [],
+   "dead": false
+  },
+  {
+   "module": "z0int.agentweb_bridge_protocol",
+   "file": "src/z0int/agentweb_bridge_protocol.py",
+   "importers": [
+    "src/z0int/agentweb_bridge_capabilities.py",
+    "src/z0int/agentweb_bridge_wire.py",
+    "tests/test_agentweb_bridge_nontransitive_secrets.py",
+    "tests/test_agentweb_bridge_protocol.py"
+   ],
+   "nonpy": [],
+   "dead": false
+  },
+  {
+   "module": "z0int.agentweb_bridge_wire",
+   "file": "src/z0int/agentweb_bridge_wire.py",
+   "importers": [
+    "src/z0int/intelligence_service.py",
+    "tests/test_agentweb_bridge_wire.py"
+   ],
+   "nonpy": [],
+   "dead": false
+  },
+  {
+   "module": "z0int.agentweb_context_packet",
+   "file": "src/z0int/agentweb_context_packet.py",
+   "importers": [
+    "src/z0int/intelligence_service.py",
+    "tests/test_agentweb_context_packet.py"
+   ],
+   "nonpy": [
+    "zer0.repo.yaml"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.ao_bridge",
+   "file": "src/z0int/ao_bridge.py",
+   "importers": [
+    "src/z0int/ao_experiment.py",
+    "src/z0int/ao_report.py",
+    "src/z0int/intelligence_service.py",
+    "tests/test_ao_bridge.py",
+    "tests/test_ao_experiment.py",
+    "tests/test_ao_report.py"
+   ],
+   "nonpy": [
+    "zer0.repo.yaml"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.ao_experiment",
+   "file": "src/z0int/ao_experiment.py",
+   "importers": [
+    "src/z0int/ao_report.py",
+    "src/z0int/cli.py",
+    "tests/test_ao_experiment.py",
+    "tests/test_ao_report.py"
+   ],
+   "nonpy": [
+    "zer0.repo.yaml"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.ao_report",
+   "file": "src/z0int/ao_report.py",
+   "importers": [
+    "src/z0int/cli.py",
+    "tests/test_ao_report.py"
+   ],
+   "nonpy": [
+    "zer0.repo.yaml"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.aodl",
+   "file": "src/z0int/aodl.py",
+   "importers": [
+    "benchmarks/bend_gate_parity.py",
+    "examples/refinement/demo.py",
+    "src/z0int/cli.py",
+    "src/z0int/refinement.py",
+    "src/z0int/task_loop.py",
+    "tests/test_task_loop.py",
+    "tests/test_z0int_aodl.py",
+    "tests/test_z0int_refinement.py"
+   ],
+   "nonpy": [
+    "README.md",
+    "docs/aodl-admission.md",
+    "docs/aodl-integration.md",
+    "docs/aodl-observation.md",
+    "docs/dispatch-authority.md",
+    "docs/intelligence-reconciliation.tsv",
+    "examples/aodl/routine-cascade.json",
+    "zer0.repo.yaml"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.aodl_admission",
+   "file": "src/z0int/aodl_admission.py",
+   "importers": [
+    "src/z0int/aodl_dispatch.py",
+    "tests/test_aodl_admission.py"
+   ],
+   "nonpy": [
+    "README.md",
+    "docs/aodl-admission.md",
+    "docs/dispatch-authority.md",
+    "zer0.repo.yaml"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.aodl_dispatch",
+   "file": "src/z0int/aodl_dispatch.py",
+   "importers": [
+    "tests/test_dispatch_authority.py"
+   ],
+   "nonpy": [
+    "zer0.repo.yaml"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.aodl_observation",
+   "file": "src/z0int/aodl_observation.py",
+   "importers": [
+    "tests/test_aodl_observation.py"
+   ],
+   "nonpy": [
+    "zer0.repo.yaml"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.artifacts",
+   "file": "src/z0int/artifacts.py",
+   "importers": [
+    "src/z0int/cli.py",
+    "src/z0int/preflight.py",
+    "tests/test_network_cutover_phase_a.py"
+   ],
+   "nonpy": [
+    "docs/intelligence-reconciliation.tsv",
+    "docs/network-cutover-phase-a.md"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.automatic",
+   "file": "src/z0int/automatic.py",
+   "importers": [
+    "src/z0int/bridge/worker.py",
+    "src/z0int/intelligence.py",
+    "src/z0int/intelligence_service.py",
+    "tests/test_agentweb_integration.py",
+    "tests/test_cc_export_regression.py",
+    "tests/test_claude_code_adapter.py",
+    "tests/test_hook_adapter.py",
+    "tests/test_intelligence_canonical.py"
+   ],
+   "nonpy": [
+    "docs/claude-code.md",
+    "docs/intelligence-operations.md",
+    "docs/intelligence-reconciliation.tsv",
+    "harness-adapters/automatic-client.mjs",
+    "harness-adapters/claude-code-z0intelligence/README.md",
+    "harness-adapters/dsh-z0intelligence/README.md",
+    "harness-adapters/hermes-z0intelligence/README.md",
+    "scripts/prove-intelligence-omp.mjs",
+    "zer0.repo.yaml"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.autoresearch",
+   "file": "src/z0int/autoresearch/__init__.py",
+   "importers": [
+    "src/z0int/cli.py"
+   ],
+   "nonpy": [
+    "benchmarks/claude_code/tasks/backend-review/task.json",
+    "docs/intelligence-reconciliation.tsv",
+    "docs/network-cutover-phase-a.md",
+    "third_party/aodl_a848270/README.md"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.autoresearch.daemon",
+   "file": "src/z0int/autoresearch/daemon.py",
+   "importers": [
+    "src/z0int/cli.py",
+    "tests/test_contrastive_evidence.py",
+    "tests/test_network_cutover_phase_a.py"
+   ],
+   "nonpy": [
+    "docs/intelligence-reconciliation.tsv"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.autoresearch.mutations",
+   "file": "src/z0int/autoresearch/mutations.py",
+   "importers": [
+    "src/z0int/autoresearch/replay.py"
+   ],
+   "nonpy": [
+    "docs/intelligence-reconciliation.tsv"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.autoresearch.queue",
+   "file": "src/z0int/autoresearch/queue.py",
+   "importers": [
+    "src/z0int/autoresearch/daemon.py",
+    "src/z0int/autoresearch/replay.py",
+    "src/z0int/bridge/runtime.py",
+    "src/z0int/cli.py",
+    "tests/test_contrastive_evidence.py",
+    "tests/test_network_cutover_phase_a.py"
+   ],
+   "nonpy": [
+    "docs/intelligence-reconciliation.tsv"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.autoresearch.replay",
+   "file": "src/z0int/autoresearch/replay.py",
+   "importers": [
+    "src/z0int/autoresearch/daemon.py",
+    "tests/test_retrieval_replay.py"
+   ],
+   "nonpy": [
+    "docs/intelligence-reconciliation.tsv"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.autoresearch.resources",
+   "file": "src/z0int/autoresearch/resources.py",
+   "importers": [
+    "src/z0int/autoresearch/daemon.py"
+   ],
+   "nonpy": [
+    "docs/intelligence-reconciliation.tsv"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.autoresearch.retrieval_exec",
+   "file": "src/z0int/autoresearch/retrieval_exec.py",
+   "importers": [
+    "tests/test_retrieval_replay.py"
+   ],
+   "nonpy": [],
+   "dead": false
+  },
+  {
+   "module": "z0int.autoresearch.schema",
+   "file": "src/z0int/autoresearch/schema.py",
+   "importers": [
+    "src/z0int/autoresearch/replay.py"
+   ],
+   "nonpy": [
+    "docs/intelligence-reconciliation.tsv"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.autoresearch.store",
+   "file": "src/z0int/autoresearch/store.py",
+   "importers": [],
+   "nonpy": [
+    "docs/intelligence-reconciliation.tsv"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.backends",
+   "file": "src/z0int/backends/__init__.py",
+   "importers": [
+    "benchmarks/local_evidence_sufficiency.py",
+    "benchmarks/state_packet/action_selector.py",
+    "src/z0int/intelligence.py",
+    "tests/test_backend_device.py",
+    "tests/test_llama_http_backend.py"
+   ],
+   "nonpy": [
+    "benchmarks/claude_code/tasks/backend-review/task.json",
+    "docs/backends.md",
+    "docs/intelligence-reconciliation.tsv",
+    "results/decision-backends/20260930-mbp-dcv1.stdout.json",
+    "results/decision-backends/20260930-mbp-dcv1/analytics.json",
+    "results/decision-backends/20260930-mbp-dcv1/bootstrap.json",
+    "results/decision-backends/20260930-mbp-dcv1/raw.jsonl",
+    "results/decision-backends/20260930-mbp-dcv1/run-manifest.json",
+    "results/decision-backends/20260930-mbp-dcv1/summary.json",
+    "results/decision-backends/20260930-mbp-dcv1/uncertainty.json",
+    "results/decision-backends/20260930-mbp-tfs-sealed77.stdout.json",
+    "results/decision-backends/20260930-mbp-tfs-sealed77/analytics.json",
+    "results/decision-backends/20260930-mbp-tfs-sealed77/bootstrap.json",
+    "results/decision-backends/20260930-mbp-tfs-sealed77/raw.jsonl",
+    "results/decision-backends/20260930-mbp-tfs-sealed77/run-manifest.json",
+    "results/decision-backends/20260930-mbp-tfs-sealed77/summary.json",
+    "results/decision-backends/20260930-mbp-tfs-sealed77/uncertainty.json",
+    "scripts/setup-julia.sh",
+    "tests/fixtures/tokenomics-bench-parity/four-way/raw.jsonl",
+    "tests/fixtures/tokenomics-bench-parity/four-way/summary.json",
+    "third_party/aodl_a848270/README.md"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.backends.base",
+   "file": "src/z0int/backends/base.py",
+   "importers": [
+    "benchmarks/julia_claims/device_compare.py",
+    "benchmarks/julia_claims/parity.py",
+    "benchmarks/julia_claims/published_claims.py",
+    "benchmarks/julia_claims/representation_ablation.py",
+    "benchmarks/julia_claims/z0_capability_compare.py",
+    "benchmarks/local_evidence_sufficiency.py",
+    "benchmarks/state_packet/action_selector.py",
+    "src/z0int/backends/bench/fixtures.py",
+    "src/z0int/backends/bench/roster.py",
+    "src/z0int/backends/bench/runner.py",
+    "src/z0int/backends/decider.py",
+    "src/z0int/backends/julia.py",
+    "src/z0int/backends/laya.py",
+    "src/z0int/backends/llama_http.py",
+    "src/z0int/backends/named_questions.py",
+    "src/z0int/backends/nanojev.py",
+    "src/z0int/backends/openjev_direct.py",
+    "src/z0int/backends/registry.py",
+    "src/z0int/bridge/decision_cache.py",
+    "src/z0int/bridge/runtime.py",
+    "src/z0int/cli.py",
+    "src/z0int/cognition/adapters/bounded.py",
+    "src/z0int/functions/laya.py",
+    "src/z0int/shadow_slot.py",
+    "tests/test_backend_bench.py",
+    "tests/test_backend_contract.py",
+    "tests/test_bridge_decision.py",
+    "tests/test_cognition_adapters.py",
+    "tests/test_decider_backend.py",
+    "tests/test_julia_backend.py",
+    "tests/test_laya_backend.py",
+    "tests/test_llama_http_backend.py",
+    "tests/test_nanojev_adapter.py",
+    "tests/test_nanojev_parity.py",
+    "tests/test_openjev_backend.py",
+    "tests/test_shadow_slot.py",
+    "tests/test_tokenomics_bridge.py"
+   ],
+   "nonpy": [
+    "benchmarks/claude_code/tasks/backend-review/task.json",
+    "docs/backends.md",
+    "docs/intelligence-reconciliation.tsv"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.backends.bench",
+   "file": "src/z0int/backends/bench/__init__.py",
+   "importers": [
+    "src/z0int/cli.py"
+   ],
+   "nonpy": [
+    "benchmarks/claude_code/tasks/backend-review/task.json",
+    "docs/intelligence-reconciliation.tsv",
+    "third_party/aodl_a848270/README.md"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.backends.bench.analytics",
+   "file": "src/z0int/backends/bench/analytics.py",
+   "importers": [
+    "src/z0int/backends/bench/runner.py"
+   ],
+   "nonpy": [
+    "docs/intelligence-reconciliation.tsv"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.backends.bench.bootstrap",
+   "file": "src/z0int/backends/bench/bootstrap.py",
+   "importers": [
+    "src/z0int/backends/bench/runner.py",
+    "tests/test_bootstrap.py"
+   ],
+   "nonpy": [
+    "docs/intelligence-reconciliation.tsv"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.backends.bench.contract",
+   "file": "src/z0int/backends/bench/contract.py",
+   "importers": [
+    "src/z0int/backends/bench/fixtures.py",
+    "src/z0int/backends/bench/materialize.py",
+    "src/z0int/backends/bench/roster.py",
+    "src/z0int/backends/bench/runner.py",
+    "tests/test_backend_bench.py",
+    "tests/test_bootstrap.py",
+    "tests/test_eligibility.py",
+    "tests/test_llama_http_backend.py",
+    "tests/test_tokenomics_bridge.py"
+   ],
+   "nonpy": [
+    "docs/intelligence-reconciliation.tsv"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.backends.bench.eligibility",
+   "file": "src/z0int/backends/bench/eligibility.py",
+   "importers": [
+    "src/z0int/backends/bench/bootstrap.py",
+    "src/z0int/backends/bench/pareto.py",
+    "src/z0int/backends/bench/runner.py",
+    "src/z0int/backends/bench/tokenomics_bridge.py",
+    "tests/test_backend_bench.py",
+    "tests/test_bootstrap.py",
+    "tests/test_eligibility.py"
+   ],
+   "nonpy": [
+    "docs/intelligence-reconciliation.tsv"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.backends.bench.fixtures",
+   "file": "src/z0int/backends/bench/fixtures.py",
+   "importers": [
+    "src/z0int/backends/bench/bootstrap.py",
+    "src/z0int/backends/bench/eligibility.py",
+    "src/z0int/backends/bench/metrics.py",
+    "src/z0int/backends/bench/runner.py",
+    "src/z0int/backends/bench/tokenomics_bridge.py",
+    "tests/test_backend_bench.py",
+    "tests/test_bootstrap.py",
+    "tests/test_eligibility.py",
+    "tests/test_mutation_retry_bench.py",
+    "tests/test_tokenomics_bridge.py"
+   ],
+   "nonpy": [
+    "docs/intelligence-reconciliation.tsv"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.backends.bench.materialize",
+   "file": "src/z0int/backends/bench/materialize.py",
+   "importers": [
+    "src/z0int/backends/bench/analytics.py",
+    "src/z0int/backends/bench/runner.py",
+    "tests/test_tokenomics_bridge.py"
+   ],
+   "nonpy": [
+    "docs/intelligence-reconciliation.tsv"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.backends.bench.metrics",
+   "file": "src/z0int/backends/bench/metrics.py",
+   "importers": [
+    "scripts/bench_pareto_table.py",
+    "scripts/local_cognition_backend_eval.py",
+    "src/z0int/backends/bench/bootstrap.py",
+    "src/z0int/backends/bench/runner.py",
+    "tests/test_backend_bench.py"
+   ],
+   "nonpy": [
+    "docs/intelligence-reconciliation.tsv"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.backends.bench.pareto",
+   "file": "src/z0int/backends/bench/pareto.py",
+   "importers": [
+    "src/z0int/backends/bench/bootstrap.py",
+    "src/z0int/backends/bench/runner.py",
+    "tests/test_backend_bench.py",
+    "tests/test_eligibility.py"
+   ],
+   "nonpy": [
+    "docs/intelligence-reconciliation.tsv"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.backends.bench.roster",
+   "file": "src/z0int/backends/bench/roster.py",
+   "importers": [
+    "benchmarks/local_evidence_sufficiency.py",
+    "scripts/local_cognition_backend_eval.py",
+    "src/z0int/backends/bench/runner.py",
+    "tests/test_backend_bench.py",
+    "tests/test_llama_http_backend.py",
+    "tests/test_tokenomics_bridge.py"
+   ],
+   "nonpy": [
+    "docs/intelligence-reconciliation.tsv"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.backends.bench.run_manifest",
+   "file": "src/z0int/backends/bench/run_manifest.py",
+   "importers": [
+    "src/z0int/backends/bench/runner.py"
+   ],
+   "nonpy": [
+    "docs/intelligence-reconciliation.tsv"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.backends.bench.runner",
+   "file": "src/z0int/backends/bench/runner.py",
+   "importers": [
+    "tests/test_backend_bench.py",
+    "tests/test_tokenomics_bridge.py"
+   ],
+   "nonpy": [
+    "docs/intelligence-reconciliation.tsv"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.backends.bench.tokenomics_bridge",
+   "file": "src/z0int/backends/bench/tokenomics_bridge.py",
+   "importers": [
+    "src/z0int/backends/bench/run_manifest.py",
+    "src/z0int/backends/bench/runner.py",
+    "tests/test_tokenomics_bridge.py"
+   ],
+   "nonpy": [
+    "docs/intelligence-reconciliation.tsv",
+    "zer0.repo.yaml"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.backends.decider",
+   "file": "src/z0int/backends/decider.py",
+   "importers": [
+    "src/z0int/backends/bench/roster.py",
+    "src/z0int/backends/registry.py",
+    "src/z0int/bridge/decision_cache.py",
+    "tests/test_backend_device.py",
+    "tests/test_backend_health_offline.py",
+    "tests/test_decider_backend.py"
+   ],
+   "nonpy": [
+    "benchmarks/claude_code/tasks/backend-review/task.json",
+    "docs/intelligence-reconciliation.tsv"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.backends.device",
+   "file": "src/z0int/backends/device.py",
+   "importers": [
+    "src/z0int/backends/decider.py",
+    "src/z0int/backends/nanojev.py",
+    "src/z0int/backends/openjev_direct.py",
+    "tests/test_backend_device.py"
+   ],
+   "nonpy": [],
+   "dead": false
+  },
+  {
+   "module": "z0int.backends.image_decision",
+   "file": "src/z0int/backends/image_decision.py",
+   "importers": [
+    "src/z0int/image_decision_cli.py",
+    "tests/test_image_decision_backend.py"
+   ],
+   "nonpy": [
+    "benchmarks/claude_code/tasks/backend-review/task.json"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.backends.julia",
+   "file": "src/z0int/backends/julia.py",
+   "importers": [
+    "benchmarks/julia_claims/device_compare.py",
+    "benchmarks/julia_claims/parity.py",
+    "benchmarks/julia_claims/published_claims.py",
+    "benchmarks/julia_claims/representation_ablation.py",
+    "benchmarks/julia_claims/z0_capability_compare.py",
+    "src/z0int/backends/bench/roster.py",
+    "src/z0int/backends/registry.py",
+    "tests/test_backend_health_offline.py",
+    "tests/test_julia_backend.py"
+   ],
+   "nonpy": [
+    "benchmarks/claude_code/tasks/backend-review/task.json",
+    "docs/julia-decision-model.md",
+    "scripts/setup-julia.sh"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.backends.julia_worker",
+   "file": "src/z0int/backends/julia_worker.py",
+   "importers": [],
+   "nonpy": [
+    "benchmarks/claude_code/tasks/backend-review/task.json",
+    "docs/julia-decision-model.md",
+    "manifests/models.z0int.json",
+    "scripts/setup-julia.sh"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.backends.laya",
+   "file": "src/z0int/backends/laya.py",
+   "importers": [
+    "src/z0int/backends/bench/roster.py",
+    "src/z0int/backends/registry.py",
+    "src/z0int/functions/laya.py",
+    "tests/test_backend_health_offline.py",
+    "tests/test_laya_backend.py"
+   ],
+   "nonpy": [
+    "benchmarks/claude_code/tasks/backend-review/task.json",
+    "docs/intelligence-reconciliation.tsv"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.backends.llama_http",
+   "file": "src/z0int/backends/llama_http.py",
+   "importers": [
+    "src/z0int/backends/bench/roster.py",
+    "src/z0int/backends/bench/runner.py",
+    "src/z0int/backends/registry.py",
+    "tests/test_llama_http_backend.py"
+   ],
+   "nonpy": [],
+   "dead": false
+  },
+  {
+   "module": "z0int.backends.named_questions",
+   "file": "src/z0int/backends/named_questions.py",
+   "importers": [
+    "src/z0int/backends/decider.py",
+    "src/z0int/backends/julia.py",
+    "src/z0int/backends/laya.py",
+    "tests/test_julia_backend.py"
+   ],
+   "nonpy": [
+    "benchmarks/claude_code/tasks/backend-review/task.json",
+    "docs/julia-decision-model.md"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.backends.nanojev",
+   "file": "src/z0int/backends/nanojev.py",
+   "importers": [
+    "src/z0int/backends/bench/roster.py",
+    "src/z0int/backends/registry.py",
+    "tests/test_backend_device.py",
+    "tests/test_nanojev_adapter.py",
+    "tests/test_nanojev_parity.py"
+   ],
+   "nonpy": [
+    "benchmarks/claude_code/tasks/backend-review/task.json",
+    "docs/intelligence-reconciliation.tsv"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.backends.nanojev_runtime",
+   "file": "src/z0int/backends/nanojev_runtime.py",
+   "importers": [
+    "src/z0int/backends/nanojev.py",
+    "src/z0int/models_mgmt.py",
+    "tests/test_nanojev_adapter.py",
+    "tests/test_nanojev_parity.py"
+   ],
+   "nonpy": [
+    "THIRD_PARTY.md",
+    "benchmarks/claude_code/tasks/backend-review/task.json",
+    "docs/intelligence-reconciliation.tsv"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.backends.openjev_direct",
+   "file": "src/z0int/backends/openjev_direct.py",
+   "importers": [
+    "src/z0int/backends/bench/roster.py",
+    "src/z0int/backends/registry.py",
+    "tests/test_backend_device.py",
+    "tests/test_openjev_backend.py"
+   ],
+   "nonpy": [
+    "benchmarks/claude_code/tasks/backend-review/task.json",
+    "docs/intelligence-reconciliation.tsv"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.backends.registry",
+   "file": "src/z0int/backends/registry.py",
+   "importers": [
+    "benchmarks/julia_claims/z0_capability_compare.py",
+    "benchmarks/local_evidence_sufficiency.py",
+    "benchmarks/state_packet/action_selector.py",
+    "src/z0int/backends/bench/roster.py",
+    "src/z0int/bridge/decision_cache.py",
+    "src/z0int/cli.py",
+    "src/z0int/doctor.py",
+    "src/z0int/preflight.py",
+    "src/z0int/shadow_slot.py",
+    "tests/test_backend_contract.py",
+    "tests/test_julia_backend.py",
+    "tests/test_llama_http_backend.py"
+   ],
+   "nonpy": [
+    "benchmarks/claude_code/tasks/backend-review/task.json",
+    "docs/intelligence-reconciliation.tsv",
+    "docs/local-cognition-portfolio.md",
+    "scripts/setup-julia.sh"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.bend_gate",
+   "file": "src/z0int/bend_gate.py",
+   "importers": [
+    "benchmarks/bend_gate_parity.py",
+    "tests/test_bend_gate.py"
+   ],
+   "nonpy": [
+    "bend/aodl_gate/README.md",
+    "bend/aodl_gate/core.bend"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.bridge",
+   "file": "src/z0int/bridge/__init__.py",
+   "importers": [
+    "src/z0int/bridge/runtime.py",
+    "tests/test_hot_path.py",
+    "tests/test_omp_capture.py",
+    "tests/test_shadow_learning.py"
+   ],
+   "nonpy": [
+    "AGENTS.md",
+    "benchmarks/claude_code/tasks/backend-review/task.json",
+    "docs/bridge-hot-reload.md",
+    "docs/intelligence-reconciliation.tsv",
+    "docs/local-cognition-omp-shadow.md",
+    "omp-extensions/z0-memory/index.test.ts",
+    "omp-extensions/z0-memory/index.ts",
+    "omp-extensions/z0int-bridge/index.test.ts",
+    "omp-extensions/z0int-bridge/index.ts",
+    "omp-extensions/z0int-bridge/omo.test.ts",
+    "third_party/aodl_a848270/README.md"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.bridge.decision_cache",
+   "file": "src/z0int/bridge/decision_cache.py",
+   "importers": [
+    "src/z0int/bridge/runtime.py",
+    "tests/test_bridge_decision.py"
+   ],
+   "nonpy": [
+    "docs/intelligence-reconciliation.tsv"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.bridge.generation",
+   "file": "src/z0int/bridge/generation.py",
+   "importers": [
+    "src/z0int/bridge/runtime.py",
+    "src/z0int/bridge/worker.py",
+    "tests/test_bridge_worker.py"
+   ],
+   "nonpy": [
+    "docs/intelligence-reconciliation.tsv"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.bridge.protocol",
+   "file": "src/z0int/bridge/protocol.py",
+   "importers": [
+    "src/z0int/bridge/generation.py",
+    "src/z0int/bridge/runtime.py",
+    "src/z0int/bridge/worker.py",
+    "tests/test_bridge_worker.py",
+    "tests/test_omp_capture.py"
+   ],
+   "nonpy": [
+    "docs/intelligence-reconciliation.tsv",
+    "docs/local-cognition-omp-shadow.md"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.bridge.runtime",
+   "file": "src/z0int/bridge/runtime.py",
+   "importers": [
+    "src/z0int/bridge/worker.py",
+    "tests/test_bridge_decision.py",
+    "tests/test_bridge_worker.py",
+    "tests/test_hot_path.py",
+    "tests/test_omp_capture.py"
+   ],
+   "nonpy": [
+    "docs/intelligence-operations.md",
+    "docs/intelligence-reconciliation.tsv",
+    "docs/local-cognition-omp-shadow.md"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.bridge.worker",
+   "file": "src/z0int/bridge/worker.py",
+   "importers": [
+    "tests/test_shadow_learning.py"
+   ],
+   "nonpy": [
+    "AGENTS.md",
+    "benchmarks/fixtures/orchestration-v2/scenarios.jsonl",
+    "docs/bridge-hot-reload.md",
+    "docs/intelligence-reconciliation.tsv",
+    "docs/local-cognition-omp-shadow.md",
+    "omp-extensions/openjev-06b/index.ts",
+    "omp-extensions/openjev/index.ts",
+    "omp-extensions/z0-memory/index.test.ts",
+    "omp-extensions/z0int-bridge/index.test.ts",
+    "omp-extensions/z0int-bridge/index.ts",
+    "omp-extensions/z0int-bridge/omo.test.ts"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.capabilities",
+   "file": "src/z0int/capabilities/__init__.py",
+   "importers": [
+    "src/z0int/cli.py"
+   ],
+   "nonpy": [
+    "benchmarks/claude_code/tasks/backend-review/task.json",
+    "docs/intelligence-reconciliation.tsv",
+    "third_party/aodl_a848270/README.md"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.capabilities.context_project_state",
+   "file": "src/z0int/capabilities/context_project_state.py",
+   "importers": [
+    "src/z0int/cli.py",
+    "tests/test_contrastive_evidence.py"
+   ],
+   "nonpy": [
+    "docs/intelligence-reconciliation.tsv"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.cascade",
+   "file": "src/z0int/cascade.py",
+   "importers": [
+    "examples/refinement/demo.py",
+    "src/z0int/aodl.py",
+    "src/z0int/cli.py",
+    "src/z0int/refinement.py",
+    "src/z0int/task_loop.py",
+    "tests/test_z0int_aodl.py",
+    "tests/test_z0int_cascade.py",
+    "tests/test_z0int_refinement.py"
+   ],
+   "nonpy": [
+    "README.md",
+    "docs/intelligence-reconciliation.tsv",
+    "docs/local-cognition-portfolio.md",
+    "examples/aodl/routine-cascade.json"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.check_class",
+   "file": "src/z0int/check_class.py",
+   "importers": [
+    "src/z0int/outcome_verifier.py",
+    "tests/test_check_class.py"
+   ],
+   "nonpy": [],
+   "dead": false
+  },
+  {
+   "module": "z0int.claude_code",
+   "file": "src/z0int/claude_code.py",
+   "importers": [
+    "src/z0int/claude_code_launch.py",
+    "src/z0int/utilization.py",
+    "tests/test_claude_code_adapter.py",
+    "tests/test_claude_code_engagement.py",
+    "tests/test_hook_adapter.py"
+   ],
+   "nonpy": [
+    "harness-adapters/claude-code-z0-obspack/bin/z0obs",
+    "harness-adapters/claude-code-z0-obspack/hooks/hooks.json",
+    "harness-adapters/claude-code-z0intelligence/README.md",
+    "omp-extensions/z0-obspack/index.ts",
+    "tests/fixtures/cc_export_6fee859.json"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.claude_code_engagement",
+   "file": "src/z0int/claude_code_engagement.py",
+   "importers": [
+    "src/z0int/loop_export.py",
+    "src/z0int/utilization.py",
+    "tests/test_claude_code_engagement.py"
+   ],
+   "nonpy": [],
+   "dead": false
+  },
+  {
+   "module": "z0int.claude_code_launch",
+   "file": "src/z0int/claude_code_launch.py",
+   "importers": [
+    "src/z0int/cli.py",
+    "tests/test_claude_code_launch.py"
+   ],
+   "nonpy": [],
+   "dead": false
+  },
+  {
+   "module": "z0int.claude_code_obs",
+   "file": "src/z0int/claude_code_obs.py",
+   "importers": [
+    "tests/test_claude_code_obs.py"
+   ],
+   "nonpy": [
+    "harness-adapters/claude-code-z0-obspack/bin/z0obs",
+    "harness-adapters/claude-code-z0-obspack/hooks/hooks.json",
+    "omp-extensions/z0-obspack/index.ts"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.claude_code_tokenomics",
+   "file": "src/z0int/claude_code_tokenomics.py",
+   "importers": [
+    "src/z0int/utilization.py",
+    "tests/test_claude_code_tokenomics.py"
+   ],
+   "nonpy": [],
+   "dead": false
+  },
+  {
+   "module": "z0int.cli",
+   "file": "src/z0int/cli.py",
+   "importers": [
+    "src/z0int/__main__.py",
+    "tests/test_backend_contract.py",
+    "tests/test_claude_code_launch.py",
+    "tests/test_hermes_decisions.py",
+    "tests/test_loop_tick.py",
+    "tests/test_outcome_verifier.py",
+    "tests/test_policy_findings.py",
+    "tests/test_posture.py",
+    "tests/test_receipt.py",
+    "tests/test_state_packet.py",
+    "tests/test_utilization.py",
+    "tests/test_verify_harness.py",
+    "tests/test_z0int_onboard.py"
+   ],
+   "nonpy": [
+    "docs/intelligence-reconciliation.tsv",
+    "pyproject.toml"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.cognition",
+   "file": "src/z0int/cognition/__init__.py",
+   "importers": [
+    "tests/test_cognition_shadow.py",
+    "tests/test_learning_runtime.py",
+    "tests/test_shadow_binary.py"
+   ],
+   "nonpy": [
+    "benchmarks/claude_code/tasks/backend-review/task.json",
+    "docs/intelligence-reconciliation.tsv",
+    "docs/local-cognition-omp-shadow.md",
+    "docs/local-cognition-portfolio.md",
+    "omp-extensions/local-cognition/index.ts",
+    "third_party/aodl_a848270/README.md"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.cognition.actions",
+   "file": "src/z0int/cognition/actions.py",
+   "importers": [
+    "scripts/compiler_contract_eval.py",
+    "scripts/local_cognition_backend_eval.py",
+    "src/z0int/cognition/adapters/bounded.py",
+    "src/z0int/cognition/adapters/local_slm.py",
+    "src/z0int/cognition/candidates.py",
+    "src/z0int/cognition/cascade.py",
+    "src/z0int/cognition/cli.py",
+    "src/z0int/cognition/probe.py",
+    "src/z0int/cognition/shadow.py",
+    "src/z0int/cognition/shadow_binary.py",
+    "tests/test_cognition_adapters.py",
+    "tests/test_cognition_candidates.py",
+    "tests/test_cognition_cascade.py",
+    "tests/test_cognition_compiler.py",
+    "tests/test_cognition_shadow.py",
+    "tests/test_cognition_surface.py",
+    "tests/test_shadow_binary.py"
+   ],
+   "nonpy": [
+    "docs/intelligence-reconciliation.tsv",
+    "docs/local-cognition-portfolio.md"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.cognition.adapters",
+   "file": "src/z0int/cognition/adapters/__init__.py",
+   "importers": [],
+   "nonpy": [
+    "benchmarks/claude_code/tasks/backend-review/task.json",
+    "docs/intelligence-reconciliation.tsv",
+    "third_party/aodl_a848270/README.md"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.cognition.adapters.bounded",
+   "file": "src/z0int/cognition/adapters/bounded.py",
+   "importers": [
+    "scripts/local_cognition_backend_eval.py",
+    "tests/test_cognition_adapters.py"
+   ],
+   "nonpy": [
+    "docs/intelligence-reconciliation.tsv"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.cognition.adapters.dialects",
+   "file": "src/z0int/cognition/adapters/dialects.py",
+   "importers": [
+    "src/z0int/cognition/adapters/local_slm.py",
+    "src/z0int/cognition/probe.py",
+    "tests/test_cognition_adapters.py",
+    "tests/test_shadow_learning.py"
+   ],
+   "nonpy": [
+    "docs/intelligence-reconciliation.tsv"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.cognition.adapters.local_slm",
+   "file": "src/z0int/cognition/adapters/local_slm.py",
+   "importers": [
+    "scripts/compiler_contract_eval.py",
+    "scripts/local_cognition_backend_eval.py",
+    "src/z0int/cognition/adapters/bounded.py",
+    "src/z0int/cognition/candidates.py",
+    "src/z0int/cognition/cascade.py",
+    "src/z0int/cognition/probe.py",
+    "src/z0int/cognition/registry.py",
+    "tests/test_cognition_adapters.py",
+    "tests/test_cognition_candidates.py",
+    "tests/test_cognition_cascade.py",
+    "tests/test_cognition_surface.py",
+    "tests/test_shadow_learning.py"
+   ],
+   "nonpy": [
+    "docs/intelligence-reconciliation.tsv"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.cognition.adapters.transport",
+   "file": "src/z0int/cognition/adapters/transport.py",
+   "importers": [
+    "src/z0int/cognition/adapters/local_slm.py",
+    "src/z0int/cognition/learning_runtime.py",
+    "src/z0int/cognition/probe.py",
+    "src/z0int/worker_routing.py",
+    "tests/test_cognition_adapters.py",
+    "tests/test_cognition_shadow.py",
+    "tests/test_learning_runtime.py",
+    "tests/test_omp_capture.py",
+    "tests/test_provider_saturation.py",
+    "tests/test_shadow_binary.py",
+    "tests/test_shadow_learning.py"
+   ],
+   "nonpy": [
+    "docs/intelligence-reconciliation.tsv",
+    "docs/local-cognition-portfolio.md"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.cognition.candidates",
+   "file": "src/z0int/cognition/candidates.py",
+   "importers": [
+    "src/z0int/cognition/cascade.py",
+    "src/z0int/cognition/cli.py",
+    "src/z0int/cognition/surface.py",
+    "tests/test_cognition_candidates.py",
+    "tests/test_cognition_surface.py"
+   ],
+   "nonpy": [
+    "docs/intelligence-reconciliation.tsv",
+    "docs/local-cognition-portfolio.md"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.cognition.cascade",
+   "file": "src/z0int/cognition/cascade.py",
+   "importers": [
+    "scripts/local_cognition_backend_eval.py",
+    "src/z0int/cognition/cli.py",
+    "src/z0int/cognition/registry.py",
+    "src/z0int/cognition/shadow.py",
+    "tests/test_cognition_cascade.py",
+    "tests/test_cognition_surface.py"
+   ],
+   "nonpy": [
+    "README.md",
+    "docs/intelligence-reconciliation.tsv",
+    "docs/local-cognition-portfolio.md"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.cognition.choice_capacity",
+   "file": "src/z0int/cognition/choice_capacity.py",
+   "importers": [
+    "src/z0int/cognition/shadow_binary.py",
+    "tests/test_choice_capacity.py",
+    "tests/test_shadow_binary.py"
+   ],
+   "nonpy": [],
+   "dead": false
+  },
+  {
+   "module": "z0int.cognition.cli",
+   "file": "src/z0int/cognition/cli.py",
+   "importers": [
+    "scripts/local_cognition_backend_eval.py",
+    "src/z0int/cli.py"
+   ],
+   "nonpy": [
+    "docs/intelligence-reconciliation.tsv"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.cognition.escalation",
+   "file": "src/z0int/cognition/escalation.py",
+   "importers": [
+    "src/z0int/cognition/candidates.py",
+    "src/z0int/cognition/cascade.py",
+    "src/z0int/cognition/cli.py",
+    "src/z0int/cognition/registry.py",
+    "src/z0int/cognition/shadow.py",
+    "src/z0int/cognition/surface.py",
+    "tests/test_cognition_cascade.py",
+    "tests/test_cognition_surface.py"
+   ],
+   "nonpy": [
+    "docs/intelligence-reconciliation.tsv",
+    "docs/local-cognition-portfolio.md"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.cognition.learning",
+   "file": "src/z0int/cognition/learning.py",
+   "importers": [
+    "src/z0int/cognition/learning_runtime.py",
+    "src/z0int/cognition/shadow.py",
+    "src/z0int/loop_export.py",
+    "src/z0int/loop_tick.py",
+    "tests/test_learning_runtime.py",
+    "tests/test_shadow_learning.py"
+   ],
+   "nonpy": [],
+   "dead": false
+  },
+  {
+   "module": "z0int.cognition.learning_families",
+   "file": "src/z0int/cognition/learning_families.py",
+   "importers": [
+    "src/z0int/cognition/learning_runtime.py",
+    "tests/test_learning_families.py"
+   ],
+   "nonpy": [],
+   "dead": false
+  },
+  {
+   "module": "z0int.cognition.learning_runtime",
+   "file": "src/z0int/cognition/learning_runtime.py",
+   "importers": [
+    "src/z0int/cognition/learning.py",
+    "tests/test_learning_runtime.py"
+   ],
+   "nonpy": [],
+   "dead": false
+  },
+  {
+   "module": "z0int.cognition.learning_search",
+   "file": "src/z0int/cognition/learning_search.py",
+   "importers": [
+    "src/z0int/cognition/learning_runtime.py",
+    "tests/test_learning_search.py"
+   ],
+   "nonpy": [],
+   "dead": false
+  },
+  {
+   "module": "z0int.cognition.manifest",
+   "file": "src/z0int/cognition/manifest.py",
+   "importers": [
+    "scripts/probe_local_cognition.py",
+    "src/z0int/cognition/adapters/local_slm.py",
+    "src/z0int/cognition/candidates.py",
+    "src/z0int/cognition/cli.py",
+    "src/z0int/cognition/probe.py",
+    "src/z0int/cognition/registry.py",
+    "src/z0int/cognition/server.py",
+    "tests/test_cognition_candidates.py",
+    "tests/test_cognition_manifest.py",
+    "tests/test_cognition_server.py",
+    "tests/test_cognition_surface.py",
+    "tests/test_shadow_learning.py"
+   ],
+   "nonpy": [
+    "docs/intelligence-reconciliation.tsv"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.cognition.mutation_outcome",
+   "file": "src/z0int/cognition/mutation_outcome.py",
+   "importers": [
+    "src/z0int/cognition/receipts.py",
+    "src/z0int/harness_capture.py",
+    "tests/test_mutation_outcome.py"
+   ],
+   "nonpy": [],
+   "dead": false
+  },
+  {
+   "module": "z0int.cognition.probe",
+   "file": "src/z0int/cognition/probe.py",
+   "importers": [
+    "scripts/probe_local_cognition.py"
+   ],
+   "nonpy": [
+    "docs/intelligence-reconciliation.tsv",
+    "docs/local-cognition-portfolio.md"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.cognition.receipts",
+   "file": "src/z0int/cognition/receipts.py",
+   "importers": [
+    "src/z0int/cognition/cascade.py",
+    "tests/test_cognition_surface.py",
+    "tests/test_mutation_outcome.py"
+   ],
+   "nonpy": [
+    "docs/intelligence-reconciliation.tsv",
+    "docs/local-cognition-portfolio.md"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.cognition.registry",
+   "file": "src/z0int/cognition/registry.py",
+   "importers": [
+    "scripts/compiler_contract_eval.py",
+    "scripts/probe_local_cognition.py",
+    "src/z0int/cognition/cli.py",
+    "src/z0int/cognition/learning_runtime.py",
+    "src/z0int/cognition/probe.py",
+    "src/z0int/cognition/shadow.py",
+    "tests/test_shadow_learning.py"
+   ],
+   "nonpy": [
+    "benchmarks/claude_code/tasks/backend-review/task.json",
+    "docs/intelligence-reconciliation.tsv",
+    "docs/local-cognition-portfolio.md"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.cognition.server",
+   "file": "src/z0int/cognition/server.py",
+   "importers": [
+    "src/z0int/cognition/cli.py",
+    "tests/test_cognition_server.py"
+   ],
+   "nonpy": [
+    "docs/intelligence-reconciliation.tsv"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.cognition.serving",
+   "file": "src/z0int/cognition/serving.py",
+   "importers": [
+    "scripts/probe_local_cognition.py",
+    "src/z0int/cognition/cli.py",
+    "src/z0int/cognition/server.py"
+   ],
+   "nonpy": [
+    "docs/intelligence-reconciliation.tsv",
+    "docs/local-cognition-portfolio.md"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.cognition.shadow",
+   "file": "src/z0int/cognition/shadow.py",
+   "importers": [
+    "src/z0int/bridge/runtime.py",
+    "src/z0int/cognition/learning.py",
+    "src/z0int/cognition/learning_runtime.py",
+    "tests/test_cognition_shadow.py",
+    "tests/test_cognition_shadow_summary.py",
+    "tests/test_omp_capture.py",
+    "tests/test_shadow_learning.py"
+   ],
+   "nonpy": [
+    "docs/intelligence-reconciliation.tsv",
+    "docs/local-cognition-omp-shadow.md",
+    "docs/local-cognition-portfolio.md"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.cognition.shadow_binary",
+   "file": "src/z0int/cognition/shadow_binary.py",
+   "importers": [
+    "src/z0int/cognition/choice_capacity.py",
+    "src/z0int/cognition/learning_runtime.py",
+    "src/z0int/cognition/shadow.py",
+    "tests/test_shadow_binary.py"
+   ],
+   "nonpy": [],
+   "dead": false
+  },
+  {
+   "module": "z0int.cognition.surface",
+   "file": "src/z0int/cognition/surface.py",
+   "importers": [
+    "src/z0int/cognition/cascade.py",
+    "src/z0int/cognition/cli.py",
+    "tests/test_cognition_surface.py"
+   ],
+   "nonpy": [
+    "docs/intelligence-reconciliation.tsv",
+    "docs/local-cognition-portfolio.md"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.compile",
+   "file": "src/z0int/compile.py",
+   "importers": [
+    "src/z0int/train.py"
+   ],
+   "nonpy": [
+    "docs/intelligence-reconciliation.tsv",
+    "pyproject.toml"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.context_resolve",
+   "file": "src/z0int/context_resolve.py",
+   "importers": [
+    "adapters/hermes_z0int/adapter.py",
+    "src/z0int/agentweb_context_packet.py",
+    "src/z0int/autoresearch/retrieval_exec.py",
+    "src/z0int/bridge/runtime.py",
+    "src/z0int/cli.py",
+    "src/z0int/intelligence_service.py",
+    "src/z0int/memory/claims.py",
+    "src/z0int/memory/surface.py",
+    "src/z0int/memory_mcp.py",
+    "src/z0int/reuse_packet.py",
+    "src/z0int/state_packet.py",
+    "src/z0int/task_loop.py",
+    "tests/test_context_resolve.py",
+    "tests/test_context_resolve_freshness.py",
+    "tests/test_context_resolve_memory.py",
+    "tests/test_hermes_adapter.py",
+    "tests/test_reuse_packet_freshness.py",
+    "tests/test_shared_file_search.py",
+    "tests/test_task_loop.py"
+   ],
+   "nonpy": [
+    "AGENTS.md",
+    "README.md",
+    "docs/ONBOARDING.md",
+    "docs/file-search.md",
+    "docs/intelligence-reconciliation.tsv",
+    "docs/memory-control-plane-contract.md",
+    "tests/fixtures/z0evals-fb14919/cohort.json",
+    "zer0.repo.yaml"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.contrastive_evidence",
+   "file": "src/z0int/contrastive_evidence.py",
+   "importers": [
+    "src/z0int/autoresearch/replay.py",
+    "src/z0int/capabilities/context_project_state.py",
+    "src/z0int/data_recipe_race.py",
+    "tests/test_contrastive_evidence.py"
+   ],
+   "nonpy": [
+    "docs/intelligence-reconciliation.tsv"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.counterfactual",
+   "file": "src/z0int/counterfactual.py",
+   "importers": [
+    "src/z0int/ao_experiment.py",
+    "src/z0int/cli.py",
+    "tests/test_ao_experiment.py",
+    "tests/test_ao_report.py",
+    "tests/test_receipt.py"
+   ],
+   "nonpy": [
+    "docs/intelligence-reconciliation.tsv"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.credit",
+   "file": "src/z0int/credit.py",
+   "importers": [
+    "src/z0int/cascade.py",
+    "src/z0int/routines.py",
+    "tests/test_z0int_credit.py"
+   ],
+   "nonpy": [
+    "docs/intelligence-reconciliation.tsv"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.data_recipe_race",
+   "file": "src/z0int/data_recipe_race.py",
+   "importers": [
+    "src/z0int/cli.py",
+    "tests/test_contrastive_evidence.py"
+   ],
+   "nonpy": [
+    "docs/intelligence-reconciliation.tsv"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.decision_experiment",
+   "file": "src/z0int/decision_experiment.py",
+   "importers": [
+    "src/z0int/intelligence_service.py",
+    "tests/test_agentweb_choice_experiment.py",
+    "tests/test_agentweb_noul_experiment.py"
+   ],
+   "nonpy": [
+    "zer0.repo.yaml"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.decision_opportunity",
+   "file": "src/z0int/decision_opportunity.py",
+   "importers": [
+    "benchmarks/decision_opportunity/falsification.py",
+    "benchmarks/decision_opportunity/selective_autonomy.py",
+    "src/z0int/claude_code_engagement.py",
+    "src/z0int/harness_capture.py",
+    "src/z0int/loop_export.py",
+    "src/z0int/shadow_slot.py",
+    "tests/test_decision_opportunity.py",
+    "tests/test_harness_capture.py",
+    "tests/test_loop_export.py",
+    "tests/test_memory_surface.py"
+   ],
+   "nonpy": [
+    "benchmarks/decision_opportunity/results_falsification_v0.json",
+    "docs/decision-opportunity.md",
+    "tests/fixtures/cc_export_6fee859.json",
+    "zer0.repo.yaml"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.dispatch_authority",
+   "file": "src/z0int/dispatch_authority.py",
+   "importers": [
+    "scripts/prove-intelligence.py",
+    "src/z0int/ao_bridge.py",
+    "src/z0int/aodl_observation.py",
+    "src/z0int/decision_experiment.py",
+    "src/z0int/governed_worker.py",
+    "src/z0int/intelligence.py",
+    "src/z0int/intelligence_service.py",
+    "src/z0int/provider_saturation.py",
+    "src/z0int/reliability_observation.py",
+    "src/z0int/remote_executor.py",
+    "src/z0int/worker_routing.py",
+    "tests/test_agentweb_bridge.py",
+    "tests/test_dispatch_authority.py",
+    "tests/test_free_only.py",
+    "tests/test_posture_routing.py",
+    "tests/test_provider_saturation.py",
+    "tests/test_worker_routing.py"
+   ],
+   "nonpy": [
+    "README.md",
+    "docs/intelligence-reconciliation.tsv",
+    "zer0.repo.yaml"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.doctor",
+   "file": "src/z0int/doctor.py",
+   "importers": [
+    "src/z0int/cli.py",
+    "tests/test_z0int_onboard.py"
+   ],
+   "nonpy": [
+    "docs/intelligence-reconciliation.tsv"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.families",
+   "file": "src/z0int/families.py",
+   "importers": [
+    "src/z0int/compile.py",
+    "src/z0int/train.py",
+    "tests/test_z0int_families.py"
+   ],
+   "nonpy": [
+    "docs/intelligence-reconciliation.tsv"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.file_search",
+   "file": "src/z0int/file_search.py",
+   "importers": [
+    "src/z0int/context_resolve.py",
+    "tests/test_file_search.py",
+    "tests/test_shared_file_search.py"
+   ],
+   "nonpy": [
+    "README.md",
+    "docs/file-search.md",
+    "docs/memory-control-plane-contract.md",
+    "zer0.repo.yaml"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.functions",
+   "file": "src/z0int/functions/__init__.py",
+   "importers": [
+    "tests/test_functions_verify.py",
+    "tests/test_intelligence_canonical.py",
+    "tests/test_typesafe_sdk_adapter.py"
+   ],
+   "nonpy": [
+    "benchmarks/claude_code/tasks/backend-review/task.json",
+    "docs/backends.md",
+    "docs/intelligence-layer.md",
+    "docs/intelligence-reconciliation.tsv",
+    "manifests/capabilities.v1.json",
+    "third_party/aodl_a848270/README.md"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.functions.contract",
+   "file": "src/z0int/functions/contract.py",
+   "importers": [
+    "src/z0int/decision_experiment.py",
+    "src/z0int/functions/jev.py",
+    "src/z0int/functions/laya.py",
+    "src/z0int/functions/verify_evidence_sufficiency.py",
+    "tests/test_typesafe_sdk_adapter.py"
+   ],
+   "nonpy": [
+    "docs/intelligence-reconciliation.tsv"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.functions.jev",
+   "file": "src/z0int/functions/jev.py",
+   "importers": [
+    "src/z0int/decision_experiment.py",
+    "src/z0int/functions/verify_evidence_sufficiency.py",
+    "src/z0int/intelligence.py",
+    "tests/test_intelligence_canonical.py",
+    "tests/test_typesafe_sdk_adapter.py"
+   ],
+   "nonpy": [
+    "docs/intelligence-layer.md",
+    "docs/intelligence-reconciliation.tsv",
+    "manifests/capabilities.v1.json",
+    "zer0.repo.yaml"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.functions.laya",
+   "file": "src/z0int/functions/laya.py",
+   "importers": [
+    "src/z0int/functions/verify_evidence_sufficiency.py"
+   ],
+   "nonpy": [
+    "benchmarks/claude_code/tasks/backend-review/task.json",
+    "docs/intelligence-reconciliation.tsv"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.functions.typesafe_sdk_client",
+   "file": "src/z0int/functions/typesafe_sdk_client.py",
+   "importers": [
+    "src/z0int/functions/jev.py",
+    "tests/test_typesafe_sdk_adapter.py"
+   ],
+   "nonpy": [],
+   "dead": false
+  },
+  {
+   "module": "z0int.functions.verify_evidence_sufficiency",
+   "file": "src/z0int/functions/verify_evidence_sufficiency.py",
+   "importers": [
+    "tests/test_functions_verify.py"
+   ],
+   "nonpy": [
+    "AGENTS.md",
+    "docs/backends.md",
+    "docs/intelligence-reconciliation.tsv"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.governed_worker",
+   "file": "src/z0int/governed_worker.py",
+   "importers": [
+    "scripts/prove-intelligence.py",
+    "src/z0int/intelligence_service.py",
+    "tests/test_governed_worker.py",
+    "tests/test_intelligence_service.py"
+   ],
+   "nonpy": [
+    "zer0.repo.yaml"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.harness_capture",
+   "file": "src/z0int/harness_capture.py",
+   "importers": [
+    "src/z0int/bridge/runtime.py",
+    "src/z0int/claude_code.py",
+    "src/z0int/memory/hook.py",
+    "src/z0int/memory/seam.py",
+    "src/z0int/memory/sources.py",
+    "src/z0int/outcome_verifier.py",
+    "tests/test_cc_export_regression.py",
+    "tests/test_dsh_capture.py",
+    "tests/test_harness_capture.py",
+    "tests/test_hermes_capture.py",
+    "tests/test_hermes_decisions.py",
+    "tests/test_hook_adapter.py",
+    "tests/test_integrate_wiring.py",
+    "tests/test_legacy_import.py",
+    "tests/test_loop_tables.py",
+    "tests/test_loop_tick.py",
+    "tests/test_memory_capture_join.py",
+    "tests/test_memory_receipt_binding.py",
+    "tests/test_memory_seam.py",
+    "tests/test_omp_capture.py",
+    "tests/test_shadow_slot.py",
+    "tests/test_turn_readers.py",
+    "tests/test_verify_harness.py"
+   ],
+   "nonpy": [
+    "harness-adapters/hermes-z0intelligence/README.md"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.harness_id",
+   "file": "src/z0int/harness_id.py",
+   "importers": [
+    "adapters/hermes_z0int/adapter.py",
+    "src/z0int/harness_capture.py",
+    "src/z0int/hermes_capture.py",
+    "src/z0int/hook_entry.py",
+    "src/z0int/legacy_import.py",
+    "src/z0int/memory/hook.py",
+    "src/z0int/memory/seam.py",
+    "tests/test_claude_code_adapter.py",
+    "tests/test_dsh_capture.py",
+    "tests/test_harness_capture.py",
+    "tests/test_hermes_capture.py",
+    "tests/test_hermes_memory.py",
+    "tests/test_hook_adapter.py",
+    "tests/test_legacy_import.py",
+    "tests/test_memory_capture_join.py",
+    "tests/test_memory_seam.py",
+    "tests/test_omp_capture.py",
+    "tests/test_turn_key.py",
+    "tests/test_turn_readers.py"
+   ],
+   "nonpy": [
+    "docs/intelligence-reconciliation.tsv",
+    "docs/network-cutover-phase-a.md",
+    "omp-extensions/z0-memory/index.test.ts"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.hermes_capture",
+   "file": "src/z0int/hermes_capture.py",
+   "importers": [
+    "tests/test_hermes_capture.py",
+    "tests/test_hermes_decisions.py",
+    "tests/test_memory_capture_join.py"
+   ],
+   "nonpy": [
+    "harness-adapters/hermes-z0intelligence/README.md"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.hermes_decisions",
+   "file": "src/z0int/hermes_decisions.py",
+   "importers": [
+    "src/z0int/cli.py",
+    "tests/test_hermes_decisions.py"
+   ],
+   "nonpy": [
+    "zer0.repo.yaml"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.hook_adapter",
+   "file": "src/z0int/hook_adapter.py",
+   "importers": [],
+   "nonpy": [
+    "harness-adapters/claude-code-z0intelligence/README.md",
+    "harness-adapters/claude-code-z0intelligence/hooks/hooks.json",
+    "harness-adapters/codex-z0intelligence/README.md",
+    "harness-adapters/codex-z0intelligence/hooks/hooks.json",
+    "harness-adapters/dsh-z0intelligence/README.md",
+    "harness-adapters/dsh-z0intelligence/capture.mjs",
+    "harness-adapters/grok-z0intelligence/README.md",
+    "harness-adapters/grok-z0intelligence/hooks/z0-capture.json",
+    "tests/test-dsh-memory.mjs",
+    "tests/test-dsh-plugin.mjs"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.hook_entry",
+   "file": "src/z0int/hook_entry.py",
+   "importers": [
+    "src/z0int/claude_code.py",
+    "src/z0int/hook_adapter.py",
+    "tests/test_cc_export_regression.py",
+    "tests/test_dsh_capture.py",
+    "tests/test_hook_adapter.py"
+   ],
+   "nonpy": [],
+   "dead": false
+  },
+  {
+   "module": "z0int.image_decision_cli",
+   "file": "src/z0int/image_decision_cli.py",
+   "importers": [],
+   "nonpy": [
+    "pyproject.toml",
+    "zer0.repo.yaml"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.intelligence",
+   "file": "src/z0int/intelligence.py",
+   "importers": [
+    "scripts/prove-intelligence.py",
+    "src/z0int/agentweb_bridge.py",
+    "src/z0int/automatic.py",
+    "src/z0int/intelligence_service.py",
+    "tests/test_agentweb_bridge.py",
+    "tests/test_dispatch_authority.py",
+    "tests/test_free_only.py",
+    "tests/test_intelligence.py",
+    "tests/test_intelligence_canonical.py",
+    "tests/test_provider_saturation.py"
+   ],
+   "nonpy": [
+    "README.md",
+    "deploy/systemd/z0intelligence.service",
+    "docs/aodl-governed-worker.md",
+    "docs/file-search.md",
+    "docs/intelligence-layer.md",
+    "docs/intelligence-operations.md",
+    "docs/intelligence-reconciliation.tsv",
+    "docs/rfc/agentweb-z0-bridge-v1.md",
+    "harness-adapters/claude-code-z0intelligence/README.md",
+    "harness-adapters/claude-code-z0intelligence/bin/z0int-mcp",
+    "harness-adapters/codex-z0intelligence/.mcp.json",
+    "harness-adapters/dsh-z0intelligence/z0-memory.cordis.yml",
+    "harness-adapters/grok-z0intelligence/mcp/z0-memory.toml",
+    "omp-extensions/z0-memory/mcp.json",
+    "zer0.repo.yaml"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.intelligence_mcp",
+   "file": "src/z0int/intelligence_mcp.py",
+   "importers": [
+    "tests/test_intelligence_canonical.py",
+    "tests/test_memory_mcp_profile.py",
+    "tests/test_memory_scrub.py",
+    "tests/test_memory_seam.py"
+   ],
+   "nonpy": [
+    "docs/file-search.md",
+    "docs/intelligence-operations.md",
+    "docs/intelligence-reconciliation.tsv",
+    "harness-adapters/claude-code-z0intelligence/README.md",
+    "harness-adapters/claude-code-z0intelligence/bin/z0int-mcp",
+    "harness-adapters/codex-z0intelligence/.mcp.json",
+    "harness-adapters/dsh-z0intelligence/z0-memory.cordis.yml",
+    "harness-adapters/grok-z0intelligence/mcp/z0-memory.toml",
+    "omp-extensions/z0-memory/mcp.json"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.intelligence_service",
+   "file": "src/z0int/intelligence_service.py",
+   "importers": [
+    "scripts/prove-intelligence.py",
+    "tests/test_agentweb_bridge_overload.py",
+    "tests/test_agentweb_integration.py",
+    "tests/test_intelligence_service.py",
+    "tests/test_intelligence_service_providers.py",
+    "tests/test_provider_saturation.py",
+    "tests/test_shared_file_search.py"
+   ],
+   "nonpy": [
+    "deploy/systemd/z0intelligence.service",
+    "docs/intelligence-operations.md",
+    "docs/intelligence-reconciliation.tsv",
+    "zer0.repo.yaml"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.kerdoios_export",
+   "file": "src/z0int/kerdoios_export.py",
+   "importers": [
+    "src/z0int/cli.py",
+    "tests/test_network_cutover_phase_a.py"
+   ],
+   "nonpy": [
+    "docs/intelligence-reconciliation.tsv"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.legacy_import",
+   "file": "src/z0int/legacy_import.py",
+   "importers": [
+    "src/z0int/loop_export.py",
+    "tests/test_legacy_import.py",
+    "tests/test_loop_tick.py"
+   ],
+   "nonpy": [],
+   "dead": false
+  },
+  {
+   "module": "z0int.loop_export",
+   "file": "src/z0int/loop_export.py",
+   "importers": [
+    "src/z0int/cli.py",
+    "src/z0int/outcome_verifier.py",
+    "src/z0int/verification_density.py",
+    "tests/test_cc_export_regression.py",
+    "tests/test_harness_capture.py",
+    "tests/test_hermes_capture.py",
+    "tests/test_hook_adapter.py",
+    "tests/test_legacy_import.py",
+    "tests/test_loop_export.py",
+    "tests/test_loop_tables.py",
+    "tests/test_loop_tick.py",
+    "tests/test_shadow_slot.py",
+    "tests/test_turn_readers.py"
+   ],
+   "nonpy": [],
+   "dead": false
+  },
+  {
+   "module": "z0int.loop_tick",
+   "file": "src/z0int/loop_tick.py",
+   "importers": [
+    "src/z0int/loop_export.py",
+    "tests/test_loop_tick.py",
+    "tests/test_shadow_learning.py"
+   ],
+   "nonpy": [],
+   "dead": false
+  },
+  {
+   "module": "z0int.memory",
+   "file": "src/z0int/memory/__init__.py",
+   "importers": [
+    "src/z0int/context_resolve.py",
+    "src/z0int/intelligence_mcp.py",
+    "tests/test_context_resolve_memory.py",
+    "tests/test_memory_acceptance.py",
+    "tests/test_memory_bench.py",
+    "tests/test_memory_capture_join.py",
+    "tests/test_memory_doctor.py",
+    "tests/test_memory_event_identity.py",
+    "tests/test_memory_scrub.py",
+    "tests/test_memory_seam.py",
+    "tests/test_memory_sources.py",
+    "tests/test_memory_surface.py",
+    "tests/test_memory_surface_capture.py"
+   ],
+   "nonpy": [
+    "README.md",
+    "benchmarks/claude_code/tasks/backend-review/task.json",
+    "docs/intelligence-reconciliation.tsv",
+    "docs/memory-control-plane-contract.md",
+    "harness-adapters/claude-code-z0intelligence/README.md",
+    "harness-adapters/claude-code-z0intelligence/hooks/hooks.json",
+    "harness-adapters/codex-z0intelligence/README.md",
+    "harness-adapters/codex-z0intelligence/hooks/hooks.json",
+    "harness-adapters/dsh-z0intelligence/README.md",
+    "harness-adapters/dsh-z0intelligence/memory.mjs",
+    "harness-adapters/grok-z0intelligence/README.md",
+    "harness-adapters/grok-z0intelligence/hooks/z0-memory.json",
+    "harness-adapters/hermes-z0intelligence/README.md",
+    "harness-adapters/memory-client.mjs",
+    "omp-extensions/z0-memory/README.md",
+    "omp-extensions/z0-memory/index.test.ts",
+    "tests/test-dsh-memory.mjs",
+    "third_party/aodl_a848270/README.md"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.memory.acceptance",
+   "file": "src/z0int/memory/acceptance.py",
+   "importers": [
+    "tests/test_memory_acceptance.py"
+   ],
+   "nonpy": [],
+   "dead": false
+  },
+  {
+   "module": "z0int.memory.claims",
+   "file": "src/z0int/memory/claims.py",
+   "importers": [
+    "adapters/hermes_z0int/native_capture.py",
+    "src/z0int/memory/surface.py",
+    "tests/test_hermes_native_capture.py",
+    "tests/test_memory_claims.py"
+   ],
+   "nonpy": [],
+   "dead": false
+  },
+  {
+   "module": "z0int.memory.cli",
+   "file": "src/z0int/memory/cli.py",
+   "importers": [
+    "src/z0int/cli.py",
+    "tests/test_memory_bench.py",
+    "tests/test_memory_doctor.py"
+   ],
+   "nonpy": [
+    "docs/intelligence-reconciliation.tsv"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.memory.doctor",
+   "file": "src/z0int/memory/doctor.py",
+   "importers": [
+    "tests/test_memory_doctor.py"
+   ],
+   "nonpy": [
+    "docs/intelligence-reconciliation.tsv"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.memory.event_log",
+   "file": "src/z0int/memory/event_log.py",
+   "importers": [
+    "adapters/hermes_z0int/native_capture.py",
+    "src/z0int/context_resolve.py",
+    "src/z0int/memory/claims.py",
+    "src/z0int/memory/optmem_tree.py",
+    "src/z0int/memory/surface.py",
+    "tests/test_bridge_worker.py",
+    "tests/test_hermes_adapter.py",
+    "tests/test_hermes_file_search_plugin.py",
+    "tests/test_hermes_native_capture.py",
+    "tests/test_memory_claims.py",
+    "tests/test_memory_event_identity.py",
+    "tests/test_memory_event_identity_hardening.py",
+    "tests/test_memory_event_log.py",
+    "tests/test_memory_event_log_hardening.py",
+    "tests/test_memory_optmem_tree.py",
+    "tests/test_memory_scrub.py",
+    "tests/test_memory_surface.py",
+    "tests/test_memory_surface_capture.py",
+    "tests/test_shared_file_search.py"
+   ],
+   "nonpy": [
+    "docs/memory-control-plane-contract.md"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.memory.hook",
+   "file": "src/z0int/memory/hook.py",
+   "importers": [
+    "tests/test_memory_capture_join.py",
+    "tests/test_memory_seam.py"
+   ],
+   "nonpy": [
+    "harness-adapters/claude-code-z0intelligence/README.md",
+    "harness-adapters/claude-code-z0intelligence/hooks/hooks.json",
+    "harness-adapters/codex-z0intelligence/README.md",
+    "harness-adapters/codex-z0intelligence/hooks/hooks.json",
+    "harness-adapters/grok-z0intelligence/README.md",
+    "harness-adapters/grok-z0intelligence/hooks/z0-memory.json"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.memory.optmem_tree",
+   "file": "src/z0int/memory/optmem_tree.py",
+   "importers": [
+    "tests/test_memory_event_identity.py",
+    "tests/test_memory_optmem_tree.py"
+   ],
+   "nonpy": [],
+   "dead": false
+  },
+  {
+   "module": "z0int.memory.scrub",
+   "file": "src/z0int/memory/scrub.py",
+   "importers": [
+    "src/z0int/intelligence_mcp.py",
+    "src/z0int/memory/doctor.py",
+    "src/z0int/memory/seam.py",
+    "src/z0int/memory/surface.py",
+    "tests/test_memory_scrub.py"
+   ],
+   "nonpy": [],
+   "dead": false
+  },
+  {
+   "module": "z0int.memory.seam",
+   "file": "src/z0int/memory/seam.py",
+   "importers": [
+    "src/z0int/harness_capture.py",
+    "tests/test_memory_acceptance.py",
+    "tests/test_memory_capture_join.py",
+    "tests/test_memory_seam.py"
+   ],
+   "nonpy": [
+    "harness-adapters/dsh-z0intelligence/README.md",
+    "harness-adapters/dsh-z0intelligence/memory.mjs",
+    "harness-adapters/hermes-z0intelligence/README.md",
+    "harness-adapters/memory-client.mjs",
+    "omp-extensions/z0-memory/README.md",
+    "omp-extensions/z0-memory/index.test.ts",
+    "tests/test-dsh-memory.mjs"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.memory.sources",
+   "file": "src/z0int/memory/sources.py",
+   "importers": [
+    "tests/test_memory_sources.py"
+   ],
+   "nonpy": [],
+   "dead": false
+  },
+  {
+   "module": "z0int.memory.surface",
+   "file": "src/z0int/memory/surface.py",
+   "importers": [
+    "src/z0int/context_resolve.py",
+    "src/z0int/intelligence_mcp.py",
+    "src/z0int/memory/doctor.py",
+    "src/z0int/memory/seam.py",
+    "src/z0int/state_packet.py",
+    "tests/test_context_resolve_memory.py",
+    "tests/test_memory_bench.py",
+    "tests/test_memory_event_identity.py",
+    "tests/test_memory_scrub.py",
+    "tests/test_memory_seam.py",
+    "tests/test_memory_surface.py",
+    "tests/test_memory_surface_capture.py"
+   ],
+   "nonpy": [
+    "docs/intelligence-reconciliation.tsv",
+    "docs/local-cognition-portfolio.md"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.memory_contract",
+   "file": "src/z0int/memory_contract.py",
+   "importers": [
+    "adapters/hermes_z0int/native_capture.py",
+    "src/z0int/context_resolve.py",
+    "src/z0int/harness_capture.py",
+    "src/z0int/intelligence_mcp.py",
+    "src/z0int/memory/acceptance.py",
+    "src/z0int/memory/claims.py",
+    "src/z0int/memory/event_log.py",
+    "src/z0int/memory/seam.py",
+    "src/z0int/memory/surface.py",
+    "tests/test_context_resolve_freshness.py",
+    "tests/test_hermes_native_capture.py",
+    "tests/test_integrate_wiring.py",
+    "tests/test_memory_capture_join.py",
+    "tests/test_memory_claims.py",
+    "tests/test_memory_contract.py",
+    "tests/test_memory_event_identity.py",
+    "tests/test_memory_event_identity_hardening.py",
+    "tests/test_memory_receipt_binding.py",
+    "tests/test_memory_scrub.py",
+    "tests/test_memory_seam.py",
+    "tests/test_memory_surface.py",
+    "tests/test_memory_surface_capture.py",
+    "tests/test_reuse_packet_freshness.py"
+   ],
+   "nonpy": [
+    "docs/ONBOARDING.md",
+    "docs/memory-control-plane-contract.md"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.memory_mcp",
+   "file": "src/z0int/memory_mcp.py",
+   "importers": [
+    "tests/test_memory_mcp.py",
+    "tests/test_memory_mcp_backends.py"
+   ],
+   "nonpy": [
+    "README.md"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.memory_mcp_backends",
+   "file": "src/z0int/memory_mcp_backends.py",
+   "importers": [
+    "src/z0int/memory_mcp.py",
+    "tests/test_memory_mcp_backends.py"
+   ],
+   "nonpy": [],
+   "dead": false
+  },
+  {
+   "module": "z0int.models_mgmt",
+   "file": "src/z0int/models_mgmt.py",
+   "importers": [
+    "src/z0int/backends/bench/roster.py",
+    "src/z0int/backends/decider.py",
+    "src/z0int/backends/julia.py",
+    "src/z0int/backends/laya.py",
+    "src/z0int/backends/openjev_direct.py",
+    "src/z0int/cli.py",
+    "tests/test_backend_contract.py",
+    "tests/test_julia_backend.py",
+    "tests/test_z0int_onboard.py"
+   ],
+   "nonpy": [
+    "docs/intelligence-reconciliation.tsv"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.onboard",
+   "file": "src/z0int/onboard.py",
+   "importers": [
+    "src/z0int/cli.py",
+    "src/z0int/status.py",
+    "tests/test_z0int_onboard.py"
+   ],
+   "nonpy": [
+    "docs/intelligence-reconciliation.tsv"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.optchat",
+   "file": "src/z0int/optchat/__main__.py",
+   "importers": [],
+   "nonpy": [
+    "AGENTS.md",
+    "docs/intelligence-reconciliation.tsv",
+    "harness-adapters/hermes-z0intelligence/README.md",
+    "omp-extensions/z0-optchat/index.ts",
+    "pyproject.toml",
+    "scripts/prove-optchat-conformance.mjs",
+    "scripts/prove-optchat-sonnet.mjs"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.optchat.browse",
+   "file": "src/z0int/optchat/browse.py",
+   "importers": [
+    "src/z0int/optchat/__main__.py",
+    "tests/test_optchat.py"
+   ],
+   "nonpy": [],
+   "dead": false
+  },
+  {
+   "module": "z0int.optchat.compact",
+   "file": "src/z0int/optchat/compact.py",
+   "importers": [
+    "src/z0int/optchat/__main__.py",
+    "tests/test_optchat.py"
+   ],
+   "nonpy": [
+    "scripts/prove-optchat-sonnet.mjs"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.optchat.log",
+   "file": "src/z0int/optchat/log.py",
+   "importers": [
+    "src/z0int/optchat/__main__.py",
+    "src/z0int/optchat/browse.py",
+    "src/z0int/optchat/compact.py",
+    "src/z0int/optchat/turn.py",
+    "tests/test_optchat.py"
+   ],
+   "nonpy": [
+    "scripts/prove-optchat-sonnet.mjs"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.optchat.persist",
+   "file": "src/z0int/optchat/persist.py",
+   "importers": [
+    "src/z0int/optchat/__main__.py",
+    "tests/test_optchat.py"
+   ],
+   "nonpy": [],
+   "dead": false
+  },
+  {
+   "module": "z0int.optchat.switch",
+   "file": "src/z0int/optchat/switch.py",
+   "importers": [
+    "src/z0int/optchat/__main__.py",
+    "tests/test_optchat.py"
+   ],
+   "nonpy": [],
+   "dead": false
+  },
+  {
+   "module": "z0int.optchat.turn",
+   "file": "src/z0int/optchat/turn.py",
+   "importers": [
+    "src/z0int/optchat/__main__.py",
+    "tests/test_optchat.py"
+   ],
+   "nonpy": [],
+   "dead": false
+  },
+  {
+   "module": "z0int.orientation",
+   "file": "src/z0int/orientation.py",
+   "importers": [
+    "tests/test_orientation.py"
+   ],
+   "nonpy": [
+    "bin/state-packet-hook",
+    "omp-extensions/z0-state-packet/index.ts"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.os_context",
+   "file": "src/z0int/os_context.py",
+   "importers": [
+    "src/z0int/specialists/next_operator.py",
+    "tests/test_os_context.py"
+   ],
+   "nonpy": [
+    "docs/intelligence-reconciliation.tsv"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.outcome_coverage",
+   "file": "src/z0int/outcome_coverage.py",
+   "importers": [
+    "src/z0int/intelligence_service.py",
+    "src/z0int/outcome_randomized_evidence.py",
+    "tests/test_outcome_coverage.py",
+    "tests/test_outcome_randomized_evidence.py"
+   ],
+   "nonpy": [],
+   "dead": false
+  },
+  {
+   "module": "z0int.outcome_observation",
+   "file": "src/z0int/outcome_observation.py",
+   "importers": [
+    "src/z0int/intelligence_service.py",
+    "src/z0int/outcome_coverage.py",
+    "src/z0int/outcome_randomized_evidence.py",
+    "src/z0int/verified_event_ingress.py",
+    "tests/test_outcome_coverage.py",
+    "tests/test_outcome_observation.py",
+    "tests/test_outcome_randomized_evidence.py",
+    "tests/test_verified_event_ingress.py"
+   ],
+   "nonpy": [],
+   "dead": false
+  },
+  {
+   "module": "z0int.outcome_randomized_evidence",
+   "file": "src/z0int/outcome_randomized_evidence.py",
+   "importers": [
+    "src/z0int/intelligence_service.py",
+    "tests/test_outcome_randomized_evidence.py"
+   ],
+   "nonpy": [],
+   "dead": false
+  },
+  {
+   "module": "z0int.outcome_verifier",
+   "file": "src/z0int/outcome_verifier.py",
+   "importers": [
+    "src/z0int/cli.py",
+    "src/z0int/loop_export.py",
+    "src/z0int/loop_tick.py",
+    "src/z0int/turn_readers.py",
+    "src/z0int/verification_density.py",
+    "tests/test_check_class.py",
+    "tests/test_loop_data_sources.py",
+    "tests/test_loop_export.py",
+    "tests/test_loop_tick.py",
+    "tests/test_outcome_verifier.py",
+    "tests/test_turn_readers.py",
+    "tests/test_verification_density.py",
+    "tests/test_verify_harness.py"
+   ],
+   "nonpy": [],
+   "dead": false
+  },
+  {
+   "module": "z0int.paths",
+   "file": "src/z0int/paths.py",
+   "importers": [
+    "src/z0int/autoresearch/resources.py",
+    "src/z0int/autoresearch/store.py",
+    "src/z0int/backends/julia.py",
+    "src/z0int/backends/llama_http.py",
+    "src/z0int/backends/nanojev.py",
+    "src/z0int/bridge/generation.py",
+    "src/z0int/bridge/runtime.py",
+    "src/z0int/capabilities/context_project_state.py",
+    "tests/test_ao_experiment.py",
+    "tests/test_ao_report.py",
+    "tests/test_loop_tick.py",
+    "tests/test_memory_receipt_binding.py",
+    "tests/test_network_cutover_phase_a.py",
+    "tests/test_z0int_onboard.py"
+   ],
+   "nonpy": [
+    "docs/intelligence-reconciliation.tsv"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.policy",
+   "file": "src/z0int/policy/__init__.py",
+   "importers": [],
+   "nonpy": [
+    "benchmarks/claude_code/tasks/backend-review/task.json",
+    "docs/intelligence-reconciliation.tsv",
+    "third_party/aodl_a848270/README.md"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.policy.changelog",
+   "file": "src/z0int/policy/changelog.py",
+   "importers": [
+    "src/z0int/policy/cli.py",
+    "tests/test_policy_compile.py"
+   ],
+   "nonpy": [],
+   "dead": false
+  },
+  {
+   "module": "z0int.policy.cli",
+   "file": "src/z0int/policy/cli.py",
+   "importers": [
+    "src/z0int/cli.py",
+    "tests/test_policy_findings.py"
+   ],
+   "nonpy": [
+    "docs/intelligence-reconciliation.tsv"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.policy.compile",
+   "file": "src/z0int/policy/compile.py",
+   "importers": [
+    "src/z0int/cognition/choice_capacity.py",
+    "src/z0int/policy/cli.py",
+    "src/z0int/policy/ingest.py",
+    "tests/test_policy_compile.py"
+   ],
+   "nonpy": [
+    "docs/intelligence-reconciliation.tsv"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.policy.findings",
+   "file": "src/z0int/policy/findings.py",
+   "importers": [
+    "src/z0int/cognition/choice_capacity.py",
+    "src/z0int/cognition/learning_search.py",
+    "src/z0int/policy/cli.py",
+    "src/z0int/policy/compile.py",
+    "src/z0int/policy/ingest.py",
+    "tests/test_choice_capacity.py",
+    "tests/test_learning_search.py",
+    "tests/test_policy_compile.py",
+    "tests/test_policy_findings.py"
+   ],
+   "nonpy": [],
+   "dead": false
+  },
+  {
+   "module": "z0int.policy.ingest",
+   "file": "src/z0int/policy/ingest.py",
+   "importers": [
+    "src/z0int/policy/cli.py",
+    "tests/test_policy_findings.py"
+   ],
+   "nonpy": [],
+   "dead": false
+  },
+  {
+   "module": "z0int.posture",
+   "file": "src/z0int/posture.py",
+   "importers": [
+    "src/z0int/claude_code_engagement.py",
+    "src/z0int/cli.py",
+    "src/z0int/state_packet.py",
+    "src/z0int/worker_routing.py",
+    "tests/test_posture.py",
+    "tests/test_posture_routing.py"
+   ],
+   "nonpy": [
+    "docs/resource-posture.md"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.preflight",
+   "file": "src/z0int/preflight.py",
+   "importers": [
+    "src/z0int/bridge/runtime.py",
+    "src/z0int/cli.py",
+    "tests/test_network_cutover_phase_a.py"
+   ],
+   "nonpy": [
+    "docs/intelligence-reconciliation.tsv",
+    "docs/network-cutover-phase-a.md"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.provider_saturation",
+   "file": "src/z0int/provider_saturation.py",
+   "importers": [
+    "scripts/prove-intelligence.py",
+    "src/z0int/decision_experiment.py",
+    "src/z0int/dispatch_authority.py",
+    "src/z0int/intelligence.py",
+    "src/z0int/intelligence_service.py",
+    "src/z0int/worker_routing.py",
+    "tests/test_free_fanout.py",
+    "tests/test_free_only.py",
+    "tests/test_intelligence_service_providers.py",
+    "tests/test_provider_saturation.py",
+    "tests/test_sidestep_free_only.py"
+   ],
+   "nonpy": [
+    "docs/intelligence-reconciliation.tsv",
+    "zer0.repo.yaml"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.quota_budget",
+   "file": "src/z0int/quota_budget.py",
+   "importers": [
+    "src/z0int/dispatch_authority.py",
+    "src/z0int/provider_saturation.py",
+    "src/z0int/worker_routing.py",
+    "tests/test_hot_path.py",
+    "tests/test_quota_budget.py"
+   ],
+   "nonpy": [
+    "docs/intelligence-reconciliation.tsv"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.receipt",
+   "file": "src/z0int/receipt.py",
+   "importers": [
+    "benchmarks/claude_code/tasks/add-feature/hidden_test.py",
+    "scripts/prove-intelligence.py",
+    "src/z0int/ao_bridge.py",
+    "src/z0int/ao_experiment.py",
+    "src/z0int/ao_report.py",
+    "src/z0int/aodl_dispatch.py",
+    "src/z0int/aodl_observation.py",
+    "src/z0int/automatic.py",
+    "src/z0int/bridge/runtime.py",
+    "src/z0int/cli.py",
+    "src/z0int/cognition/cascade.py",
+    "src/z0int/cognition/shadow.py",
+    "src/z0int/counterfactual.py",
+    "src/z0int/dispatch_authority.py",
+    "src/z0int/functions/verify_evidence_sufficiency.py",
+    "src/z0int/governed_worker.py",
+    "src/z0int/legacy_import.py",
+    "src/z0int/provider_saturation.py",
+    "src/z0int/quota_budget.py",
+    "src/z0int/reliability_observation.py",
+    "src/z0int/status.py",
+    "src/z0int/worker_activity.py",
+    "src/z0int/worker_routing.py",
+    "tests/test_agentweb_bridge.py",
+    "tests/test_ao_bridge.py",
+    "tests/test_ao_experiment.py",
+    "tests/test_ao_report.py",
+    "tests/test_aodl_observation.py",
+    "tests/test_cognition_cascade.py",
+    "tests/test_dispatch_authority.py",
+    "tests/test_free_fanout.py",
+    "tests/test_free_only.py",
+    "tests/test_functions_verify.py",
+    "tests/test_governed_worker.py",
+    "tests/test_intelligence.py",
+    "tests/test_memory_contract.py",
+    "tests/test_memory_receipt_binding.py",
+    "tests/test_provider_saturation.py",
+    "tests/test_receipt.py",
+    "tests/test_sidestep_free_only.py",
+    "tests/test_worker_activity_live.py"
+   ],
+   "nonpy": [
+    ".verified-oss-loop/inventory.yml",
+    "benchmarks/claude_code/tasks/add-feature/task.json",
+    "benchmarks/claude_code/tasks/debug-suite/task.json",
+    "benchmarks/claude_code/tasks/grep-answer/task.json",
+    "docs/intelligence-reconciliation.tsv",
+    "zer0.repo.yaml"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.refinement",
+   "file": "src/z0int/refinement.py",
+   "importers": [
+    "examples/refinement/demo.py",
+    "src/z0int/cli.py",
+    "tests/test_z0int_refinement.py"
+   ],
+   "nonpy": [
+    "README.md",
+    "docs/intelligence-reconciliation.tsv",
+    "docs/routine-repair.md",
+    "skills/z0int-repair-routine/SKILL.md"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.reliability_observation",
+   "file": "src/z0int/reliability_observation.py",
+   "importers": [
+    "src/z0int/intelligence_service.py",
+    "tests/test_agentweb_reliability_observation.py"
+   ],
+   "nonpy": [
+    "zer0.repo.yaml"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.remote_executor",
+   "file": "src/z0int/remote_executor.py",
+   "importers": [
+    "scripts/prove-intelligence.py",
+    "tests/test_dispatch_authority.py",
+    "tests/test_free_only.py",
+    "tests/test_governed_worker.py",
+    "tests/test_provider_saturation.py"
+   ],
+   "nonpy": [
+    "deploy/executor/Dockerfile",
+    "docs/file-search.md",
+    "docs/intelligence-reconciliation.tsv",
+    "zer0.repo.yaml"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.replay",
+   "file": "src/z0int/replay/__init__.py",
+   "importers": [],
+   "nonpy": [
+    "benchmarks/claude_code/tasks/backend-review/task.json",
+    "docs/intelligence-reconciliation.tsv",
+    "third_party/aodl_a848270/README.md"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.replay.worker_needed",
+   "file": "src/z0int/replay/worker_needed.py",
+   "importers": [
+    "src/z0int/cli.py"
+   ],
+   "nonpy": [
+    "docs/intelligence-reconciliation.tsv"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.reuse_packet",
+   "file": "src/z0int/reuse_packet.py",
+   "importers": [
+    "tests/test_context_resolve_freshness.py",
+    "tests/test_reuse_packet_freshness.py"
+   ],
+   "nonpy": [],
+   "dead": false
+  },
+  {
+   "module": "z0int.routines",
+   "file": "src/z0int/routines.py",
+   "importers": [
+    "examples/refinement/demo.py",
+    "src/z0int/aodl.py",
+    "src/z0int/cli.py",
+    "src/z0int/refinement.py",
+    "src/z0int/shadow_slot.py",
+    "tests/test_z0int_aodl.py",
+    "tests/test_z0int_refinement.py",
+    "tests/test_z0int_refinement_cli.py",
+    "tests/test_z0int_routines.py"
+   ],
+   "nonpy": [
+    "README.md",
+    "docs/intelligence-reconciliation.tsv",
+    "docs/routine-compiler.md",
+    "zer0.repo.yaml"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.shadow_slot",
+   "file": "src/z0int/shadow_slot.py",
+   "importers": [
+    "tests/test_loop_tick.py",
+    "tests/test_shadow_slot.py"
+   ],
+   "nonpy": [],
+   "dead": false
+  },
+  {
+   "module": "z0int.specialists",
+   "file": "src/z0int/specialists/__init__.py",
+   "importers": [
+    "src/z0int/cli.py"
+   ],
+   "nonpy": [
+    "benchmarks/claude_code/tasks/backend-review/task.json",
+    "docs/intelligence-reconciliation.tsv",
+    "third_party/aodl_a848270/README.md"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.specialists.next_operator",
+   "file": "src/z0int/specialists/next_operator.py",
+   "importers": [
+    "src/z0int/cli.py",
+    "tests/test_os_context.py"
+   ],
+   "nonpy": [
+    "docs/intelligence-reconciliation.tsv"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.state_packet",
+   "file": "src/z0int/state_packet.py",
+   "importers": [
+    "benchmarks/decision_opportunity/falsification.py",
+    "benchmarks/decision_opportunity/selective_autonomy.py",
+    "benchmarks/state_packet/action_selector.py",
+    "src/z0int/claude_code.py",
+    "src/z0int/claude_code_engagement.py",
+    "src/z0int/cli.py",
+    "src/z0int/decision_opportunity.py",
+    "tests/test_cc_export_regression.py",
+    "tests/test_claude_code_adapter.py",
+    "tests/test_claude_code_engagement.py",
+    "tests/test_harness_capture.py",
+    "tests/test_hermes_capture.py",
+    "tests/test_memory_surface.py",
+    "tests/test_state_packet.py"
+   ],
+   "nonpy": [
+    "AGENTS.md",
+    "benchmarks/state_packet/injection.json",
+    "benchmarks/state_packet/questions.json",
+    "benchmarks/state_packet/questions_holdout.json",
+    "benchmarks/state_packet/questions_pinned.json",
+    "benchmarks/state_packet/results_pinned.json",
+    "benchmarks/state_packet/results_pinned_haiku.json",
+    "benchmarks/state_packet/results_postfix.json",
+    "benchmarks/state_packet/results_s2.json",
+    "benchmarks/state_packet/results_v0.json",
+    "tests/fixtures/cc_export_6fee859.json",
+    "zer0.repo.yaml"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.status",
+   "file": "src/z0int/status.py",
+   "importers": [
+    "src/z0int/cli.py"
+   ],
+   "nonpy": [
+    "docs/intelligence-reconciliation.tsv"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.task_loop",
+   "file": "src/z0int/task_loop.py",
+   "importers": [
+    "src/z0int/cli.py",
+    "tests/test_task_loop.py"
+   ],
+   "nonpy": [
+    "docs/intelligence-reconciliation.tsv"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.tokenomics_emit",
+   "file": "src/z0int/tokenomics_emit.py",
+   "importers": [
+    "src/z0int/aodl_dispatch.py",
+    "src/z0int/claude_code_tokenomics.py",
+    "src/z0int/loop_tick.py",
+    "src/z0int/replay/worker_needed.py",
+    "tests/test_aodl_observation.py",
+    "tests/test_dispatch_authority.py",
+    "tests/test_tokenomics_emit.py"
+   ],
+   "nonpy": [
+    "README.md",
+    "docs/intelligence-reconciliation.tsv",
+    "zer0.repo.yaml"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.train",
+   "file": "src/z0int/train.py",
+   "importers": [],
+   "nonpy": [
+    "docs/intelligence-reconciliation.tsv",
+    "docs/network-cutover-finish-report.md",
+    "examples/jevlike/chess/README.md",
+    "pyproject.toml"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.turn_readers",
+   "file": "src/z0int/turn_readers.py",
+   "importers": [
+    "src/z0int/loop_export.py",
+    "tests/test_turn_readers.py"
+   ],
+   "nonpy": [],
+   "dead": false
+  },
+  {
+   "module": "z0int.usage_surface",
+   "file": "src/z0int/usage_surface.py",
+   "importers": [
+    "tests/test_usage_surface.py"
+   ],
+   "nonpy": [],
+   "dead": false
+  },
+  {
+   "module": "z0int.utilization",
+   "file": "src/z0int/utilization.py",
+   "importers": [
+    "src/z0int/cli.py",
+    "tests/test_utilization.py"
+   ],
+   "nonpy": [
+    "docs/utilization.md"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.verification_density",
+   "file": "src/z0int/verification_density.py",
+   "importers": [
+    "src/z0int/outcome_verifier.py",
+    "tests/test_verification_density.py"
+   ],
+   "nonpy": [],
+   "dead": false
+  },
+  {
+   "module": "z0int.verified_event_ingress",
+   "file": "src/z0int/verified_event_ingress.py",
+   "importers": [
+    "src/z0int/intelligence_service.py",
+    "tests/test_verified_event_ingress.py"
+   ],
+   "nonpy": [],
+   "dead": false
+  },
+  {
+   "module": "z0int.worker_activity",
+   "file": "src/z0int/worker_activity.py",
+   "importers": [
+    "tests/test_worker_activity.py",
+    "tests/test_worker_activity_live.py"
+   ],
+   "nonpy": [
+    "README.md",
+    "docs/intelligence-reconciliation.tsv",
+    "docs/worker-activity.md",
+    "zer0.repo.yaml"
+   ],
+   "dead": false
+  },
+  {
+   "module": "z0int.worker_routing",
+   "file": "src/z0int/worker_routing.py",
+   "importers": [
+    "src/z0int/dispatch_authority.py",
+    "src/z0int/governed_worker.py",
+    "src/z0int/intelligence.py",
+    "src/z0int/intelligence_mcp.py",
+    "src/z0int/intelligence_service.py",
+    "src/z0int/posture.py",
+    "src/z0int/provider_saturation.py",
+    "src/z0int/quota_budget.py",
+    "src/z0int/remote_executor.py",
+    "tests/test_dispatch_authority.py",
+    "tests/test_free_fanout.py",
+    "tests/test_free_only.py",
+    "tests/test_hot_path.py",
+    "tests/test_intelligence.py",
+    "tests/test_intelligence_canonical.py",
+    "tests/test_posture_routing.py",
+    "tests/test_provider_saturation.py",
+    "tests/test_sidestep_free_only.py",
+    "tests/test_worker_routing.py",
+    "tests/test_worker_routing_host_override.py"
+   ],
+   "nonpy": [
+    "README.md",
+    "docs/intelligence-layer.md",
+    "docs/intelligence-reconciliation.tsv",
+    "docs/resource-posture.md",
+    "manifests/worker_routing.v1.json",
+    "zer0.repo.yaml"
+   ],
+   "dead": false
+  }
+ ]
+}
