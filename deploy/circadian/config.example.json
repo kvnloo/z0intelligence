@@ -1,0 +1,15 @@
+{
+  "tz": "America/New_York",
+  "wakeTarget": "07:30",
+  "bedTarget": "00:30",
+  "nightModeAt": "22:00",
+  "enforce": "quiet_only",
+  "criticalOptIn": false,
+  "shadowDates": ["2026-10-31", "2026-11-01", "2026-11-02"],
+  "tickSeconds": 60,
+  "http": {"port": 0},
+  "activitywatch": {"url": "http://localhost:<aw-port>"},
+  "phone": {"adb": "<path to adb>", "model": "<adb device model>", "everyMinutes": 15},
+  "noop": {"db": "<private path to a NOOP DB copy>"},
+  "deliverCmd": ["~/.local/bin/dash-report"]
+}
