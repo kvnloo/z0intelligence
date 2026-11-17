@@ -1,0 +1,30 @@
+# Host STT stays loopback. The kind bridge listener is a local forwarder,
+# because Whisperflow refuses a non-loopback bind. Cluster path matches
+# z0intelligence: selector-less Service plus an EndpointSlice on the kind gateway.
+apiVersion: v1
+kind: Service
+metadata:
+  name: whisperflow
+  namespace: hermes-lab
+spec:
+  ports:
+    - name: http
+      port: 8766
+      targetPort: 8766
+---
+apiVersion: discovery.k8s.io/v1
+kind: EndpointSlice
+metadata:
+  name: whisperflow-host
+  namespace: hermes-lab
+  labels:
+    kubernetes.io/service-name: whisperflow
+addressType: IPv4
+ports:
+  - name: http
+    protocol: TCP
+    port: 8766
+endpoints:
+  - addresses: ["172.19.0.1"]
+    conditions:
+      ready: false
