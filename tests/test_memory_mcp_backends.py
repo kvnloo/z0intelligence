@@ -422,3 +422,11 @@ def test_unknown_archive_schema_falls_back_to_http(native, tmp_path):
     _sqlite_archive(tmp_path, [(SESSION, PROJECT, 7, "assistant", "verified", None)], user_version=1)
     rows = backend.search_backend("agentsview", "verified", [grant()], 1, 2)
     assert rows and native["calls"]  # served by the HTTP contract path
+
+
+def test_agentsview_v143_archive_is_read_directly(native, tmp_path):
+    # AgentsView v0.46.1 writes user_version 143 (live sessions.db, 2026-11-16); unknown versions take the
+    # slow HTTP path that timed out, so the live archive must be on the read-only SQLite path.
+    _sqlite_archive(tmp_path, [(SESSION, PROJECT, 7, "assistant", "verified", None)], user_version=143)
+    rows = backend.search_backend("agentsview", "verified", [grant()], 1, 2)
+    assert [r["text"] for r in rows] == ["verified"] and native["calls"] == []
