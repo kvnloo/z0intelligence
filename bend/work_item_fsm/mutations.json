@@ -1,0 +1,72 @@
+{
+  "verdict_mode": true,
+  "rows": [
+    {
+      "law": "-",
+      "mutation": "reference (unmodified)",
+      "proofs_check": true,
+      "where": ""
+    },
+    {
+      "law": "1 merged_needs_owner_acceptance",
+      "mutation": "Merge straight from Deployed, skipping owner acceptance",
+      "proofs_check": false,
+      "where": "inv_deployed"
+    },
+    {
+      "law": "2 verify_gate_not_author",
+      "mutation": "Verifier may be the author",
+      "proofs_check": false,
+      "where": "verify_actor"
+    },
+    {
+      "law": "2 accept_gate_owner_not_author",
+      "mutation": "Any non-author may accept",
+      "proofs_check": false,
+      "where": "inv_deployed"
+    },
+    {
+      "law": "3 draft_needs_bound_receipt",
+      "mutation": "Receipt need not be for the head SHA",
+      "proofs_check": false,
+      "where": "binds_ok"
+    },
+    {
+      "law": "4 deployed_serves_integrated_head",
+      "mutation": "Deploy whatever the service runs",
+      "proofs_check": false,
+      "where": "inv_integrated"
+    },
+    {
+      "law": "4 drift_undeploys",
+      "mutation": "Observing drift keeps the item Deployed",
+      "proofs_check": false,
+      "where": "inv_deployed"
+    },
+    {
+      "law": "5 interrupted_exits_keep_head",
+      "mutation": "Resume restarts from an empty head",
+      "proofs_check": false,
+      "where": "inv_interrupted"
+    },
+    {
+      "law": "6 implementer_is_coder",
+      "mutation": "Free models may claim and implement",
+      "proofs_check": false,
+      "where": "coder_ok"
+    },
+    {
+      "law": "7 queue_never_blocks",
+      "mutation": "While Kevin is off, hold every event (owner is a blocker)",
+      "proofs_check": false,
+      "where": "Laws.owner_off_holds"
+    },
+    {
+      "law": "7 owner_off_holds",
+      "mutation": "Owner actions fire while Kevin is off",
+      "proofs_check": false,
+      "where": "Laws.owner_off_holds"
+    }
+  ],
+  "reference_restored": true
+}
