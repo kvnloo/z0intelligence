@@ -1,0 +1,18 @@
+[Unit]
+Description=Tailnet gateway (bearer auth) to the k3s vLLM-SR router for fleet hosts
+After=network-online.target tailscaled.service k3s.service
+
+[Service]
+Type=simple
+Slice=agent.slice
+Environment=GATEWAY_HOST=100.113.138.100
+Environment=GATEWAY_PORT=8898
+Environment=ROUTER_UPSTREAM=http://10.43.216.55:8899
+ExecStart=/usr/bin/python3 /mnt/zer0models/workspace/zer0/oss/tools/dsh-env-exec.py --allow VLLM_SR_CLIENT_TOKEN -- %h/.local/share/sub-proxy/python3 -I /mnt/zer0models/z0-wt/z0int-vllm-sr-turbo/deploy/vllm-sr/subproxy/router_gateway.py
+Restart=always
+RestartSec=5
+MemoryMax=256M
+OOMScoreAdjust=100
+
+[Install]
+WantedBy=default.target
