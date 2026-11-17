@@ -115,6 +115,28 @@ def test_a_registered_root_ctx_reports_missing_is_a_wrong_shape_failure(world):
     assert any('registered but missing' in p for p in out['problems'])
 
 
+
+def test_a_retired_hermes_profile_root_is_deregistered_on_apply_and_the_home_db_never_is(world, tmp_path):
+    gone = tmp_path / 'hh' / 'profiles' / 'retired' / 'state.db'
+    emptied = tmp_path / 'hh' / 'profiles' / 'emptied' / 'state.db'
+    emptied.parent.mkdir(parents=True)  # profile dir left behind without its state (logs/ only)
+    home_db = tmp_path / 'hh' / 'state.db'
+    (world['ctx_root'] / 'config.toml').write_text(
+        f'[sources.roots.hermes-retired]\nprovider = "hermes"\npath = "{gone}"\n\n'
+        f'[sources.roots.auto-hermes-x]\nprovider = "hermes"\npath = "{emptied}"\n\n'
+        f'[sources.roots.hermes-root]\nprovider = "hermes"\npath = "{home_db}"\n')
+    roots = [{'provider': 'claude', 'path': str(world['claude']), 'status': 'available'},
+             {'provider': 'pi', 'path': str(world['omp']), 'status': 'available'}]
+    fake = FakeCtx(roots + [{'provider': 'hermes', 'path': str(x), 'status': 'missing'}
+                            for x in (gone, emptied, home_db)])
+    assert sum('registered but missing' in p for p in run(world, fake)['problems']) == 3
+    assert not [c for c in fake.calls if 'remove' in c]  # read-only without --apply
+    out = run(world, fake, apply=True)
+    assert [c[-1] for c in fake.calls if c[1:3] == ['sources', 'remove']] == ['hermes-retired', 'auto-hermes-x']
+    assert out['unresolved'] == [f'ctx root hermes {home_db}: registered but missing (wrong path shape?)']
+    assert all(a['backup'] and Path(a['backup']).exists() for a in out['applied'] if a.get('retired'))
+
+
 def test_agentsview_behind_disk_fails_and_home_noise_does_not_count(world):
     touch(world['omp'] / '--proj--' / 'new.jsonl', 0)  # 1.5 h after AgentsView's newest: fine
     fake = FakeCtx([{'provider': 'claude', 'path': str(world['claude']), 'status': 'available'},
