@@ -14,6 +14,11 @@ import socket
 import sys
 import threading
 
+try:
+    import fcntl
+except ImportError:  # Windows has no fcntl; the AF_UNIX lock below still works there
+    fcntl = None
+
 from .browse import write_html
 from .compact import NodeKey, Scheduler
 from .log import ChatLog, chat_root, load_chat
@@ -23,9 +28,8 @@ from .turn import Queue, begin, leave_unanswered, record, subagent_text, wait_re
 
 
 
-def take_lock(path: Path) -> socket.socket:
+def _socket_lock(path: Path) -> socket.socket:
     """One writer. A listening socket is live. A refusing socket is stale."""
-    path.parent.mkdir(parents=True, exist_ok=True)
     probe = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     try:
         probe.connect(str(path))
@@ -41,6 +45,32 @@ def take_lock(path: Path) -> socket.socket:
     holder.bind(str(path))
     holder.listen(1)
     return holder
+
+
+def _flock_lock(path: Path):
+    """One writer without sockets: flock needs none and releases when the holder dies."""
+    try:
+        holder = open(path, "a+b")
+    except OSError:
+        path.unlink(missing_ok=True)  # a stale socket inode cannot be opened as a file
+        holder = open(path, "a+b")
+    try:
+        fcntl.flock(holder.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        holder.close()
+        raise SystemExit("another OptChat writer holds the lock")
+    return holder
+
+
+def take_lock(path: Path):
+    """One writer. Sandboxes can refuse AF_UNIX sockets; flock needs none and is the fallback."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        return _socket_lock(path)
+    except (OSError, AttributeError):  # EPERM at socket(), or no AF_UNIX in this Python
+        if fcntl is None:
+            raise
+        return _flock_lock(path)
 
 
 class Resident:
@@ -261,7 +291,8 @@ def serve(mode: str | None = None) -> int:
         if resident is not None:
             resident.close()
         holder.close()
-        (root / "lock").unlink(missing_ok=True)
+        if isinstance(holder, socket.socket):
+            (root / "lock").unlink(missing_ok=True)
         signal.signal(signal.SIGTERM, previous_handler)
     return 0
 

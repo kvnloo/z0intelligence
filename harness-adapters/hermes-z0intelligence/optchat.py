@@ -73,6 +73,7 @@ class OptChat:
         self._jobs: queue.Queue = queue.Queue(MAX_JOBS)
         self._responses: queue.Queue = queue.Queue()
         self._proc = None
+        self._err_log = None
         self._closed = False
         self._active: set[tuple[str, str]] = set()
         self._active_lock = threading.Lock()
@@ -89,11 +90,14 @@ class OptChat:
         if not self.python:
             raise RuntimeError("z0int_python is not configured")
         env = dict(os.environ, Z0INT_HOME=str(self.home), Z0INT_OPTCHAT_ROOT=str(self.root))
+        log_path = self.root.parent / "server.stderr.log"
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        self._err_log = open(log_path, "ab")
         self._proc = subprocess.Popen(
             [self.python, "-u", "-m", "z0int.optchat", "--mode", self.mode],
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
+            stderr=self._err_log,
             text=True,
             bufsize=1,
             env=env,
@@ -274,6 +278,12 @@ class OptChat:
 
     def _stop_proc(self) -> None:
         proc, self._proc = self._proc, None
+        err_log, self._err_log = self._err_log, None
+        if err_log is not None:
+            try:
+                err_log.close()
+            except Exception:
+                pass
         if proc is None:
             return
         try:

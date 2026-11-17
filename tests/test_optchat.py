@@ -6,6 +6,7 @@ import json
 import os
 import queue
 import random
+import socket
 import subprocess
 import sys
 import threading
@@ -16,7 +17,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
-from z0int.optchat.__main__ import Resident, serve
+from z0int.optchat.__main__ import Resident, serve, take_lock
 from z0int.optchat.compact import (
     CompactorMessages, Scheduler, SonnetBridge, commit_line, compactor_messages,
     cut_utf8, due, enforce, ollama_complete, pump,
@@ -392,6 +393,30 @@ class RetainedBehaviorTests(unittest.TestCase):
                         self.assertEqual(scheduler.call_args.args[0].root, configured)
                         self.assertEqual(scheduler.call_args.kwargs["on"], mode == "on")
                 self.assertFalse((home / "optchat" / "enabled").exists())
+
+    @unittest.skipUnless(os.name == "posix", "the flock fallback needs POSIX fcntl")
+    def test_take_lock_falls_back_to_flock_when_af_unix_is_refused(self) -> None:
+        with TemporaryDirectory() as tmp:
+            path = Path(tmp) / "lock"
+            real_socket = socket.socket
+
+            def refused(*args, **kwargs):
+                if args and args[0] == socket.AF_UNIX:
+                    raise PermissionError(1, "Operation not permitted")
+                return real_socket(*args, **kwargs)
+
+            with patch("z0int.optchat.__main__.socket.socket", side_effect=refused):
+                holder = take_lock(path)
+                try:
+                    self.assertFalse(isinstance(holder, real_socket))
+                    with self.assertRaises(SystemExit):
+                        take_lock(path)
+                finally:
+                    holder.close()
+            self.assertTrue(path.exists())  # a flock holder leaves the file; the kernel releases the lock
+            holder = take_lock(path)
+            self.assertIsInstance(holder, socket.socket)  # the socket path treats the regular file as stale
+            holder.close()
 
     def test_subagent_report_is_logged_as_the_users_named_work(self) -> None:
         from z0int.optchat.turn import subagent_text
