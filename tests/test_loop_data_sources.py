@@ -114,6 +114,33 @@ def test_no_source_holding_any_session_is_still_label_source_empty(env):
     assert 'hello' not in json.dumps(report['failures'])
 
 
+def test_locating_many_sessions_lists_each_tree_once_with_the_same_precedence(env, monkeypatch):
+    # 11-16 audit: one glob('*/<sid>.jsonl') per captured session per tree listed every tree 6,256x per tick (151 s)
+    home, _, other = env
+    first = other.parent.parent / 'first' / 'projects'
+    def put(projects, sid, slug):
+        t = Transcript(session=sid)
+        t.prompt('p', 'hi', T0)
+        return t.write(projects, slug=slug)
+    a = put(first, 'cc-1', 'a-proj')
+    put(first, 'cc-1', 'b-proj')                     # within a tree the sorted-first project dir wins
+    put(other, 'cc-1', 'a-proj')                     # also in the second tree: the first tree wins
+    c = put(other, 'cc-3', 'z-proj')
+    monkeypatch.setenv('CLAUDE_CONFIG_DIR', str(first.parent))
+    monkeypatch.setenv(ov.EXTRA_PROJECTS_ENV, str(other))
+    globs = []
+    real = type(first).glob
+    monkeypatch.setattr(type(first), 'glob', lambda self, pat, *a, **k: globs.append(pat) or real(self, pat, *a, **k))
+    sids = ['cc-1', 'cc-3', 'cc-missing', *[f'cc-x{i}' for i in range(50)]]
+    got = ov.locate_transcripts(sids)
+    assert not [g for g in globs if g.startswith('*/cc-')]
+    assert got['cc-1'] == (a, 'projects_dir') and got['cc-3'] == (c, 'extra_projects_dir')
+    assert got['cc-missing'] == (None, None)
+    for sid in sids:                                 # identical to the one-at-a-time lookup
+        assert got[sid] == ov.locate_transcript(sid)
+    assert ov.locate_transcripts(['cc-3'], first) == {'cc-3': (None, None)}   # explicit base: only tree searched
+
+
 # ----------------------------------------------------------------------------- the tick
 def test_tick_labels_from_an_agentsview_indexed_transcript(world, learner):  # noqa: F811
     cc_opportunities(world.home)
