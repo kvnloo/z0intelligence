@@ -12,8 +12,8 @@ against it.
 * **Checks.** Per harness root: AgentsView sync lag (disk mtime vs newest indexed session), ctx registration,
   and ctx's own per-root status (a registered root that ctx reports ``missing`` is a wrong path shape).
   Memory MCP grants: projects with recent owner sessions that no operator grant covers.
-* **Repair.** ``--apply`` registers missing ctx roots with ``ctx sources add`` (additive, real paths, stable
-  ``auto-<agent>-<hash>`` names). Grants are privacy policy and are reported, never widened here.
+* **Repair.** ``--apply`` registers missing ctx roots with ``ctx sources add`` (real paths, stable
+  ``auto-<agent>-<hash>`` names) and deregisters roots of retired Hermes profiles (config backed up first). Grants are privacy policy and are reported, never widened here.
 
 Read-only unless ``apply=True``. Stdlib only.
 """
@@ -319,6 +319,29 @@ def _benign_missing(row: Mapping[str, Any], rows: Iterable[Mapping[str, Any]]) -
                and os.path.dirname(_real(r['path'])) == parent for r in rows)
 
 
+def _retired_profile_db(path: str | Path) -> bool:
+    """A Hermes *profile* state.db that no longer exists: the profile was archived or retired.
+
+    Retiring a profile left its ctx root registered (chiefstaff/n11scratch/eui-tern-proof 2026-11-16 after
+    rippletern/mytern/gym-evaluator 2026-11-15), so the recall check failed until someone ran ``ctx sources
+    remove`` by hand. Removing the registration deletes no history; a profile that comes back is re-added by
+    the active-on-disk path. The root ``hermes-home/state.db`` is never matched here.
+    """
+    p = Path(os.path.expanduser(str(path)))
+    return p.name == 'state.db' and p.parent.parent.name == 'profiles' and not p.exists()
+
+
+def _backup_ctx_config(data_root: str | Path | None = None) -> str | None:
+    root = Path(data_root or os.environ.get('CTX_DATA_ROOT') or '~/.ctx').expanduser()
+    src = root / 'config.toml'
+    dst = root / f'config.toml.bak-retired-{time.strftime("%Y%m%dT%H%M%S")}'
+    try:
+        shutil.copy2(src, dst)
+    except OSError:
+        return None
+    return str(dst)
+
+
 def ungranted_projects(conn: sqlite3.Connection, policy_path: str | Path, *, principal: str = 'operator',
                        days: float = GRANT_DAYS, now: float | None = None) -> list[dict[str, Any]] | None:
     try:
@@ -431,6 +454,18 @@ def reconcile(*, av_dir: str | Path | None = None, ctx_bin: str | None = None,
                                     'mirror_for': root, 'fixes': f'{root}: ctx import fails',
                                     'detail': f"resynced {sync['sessions']} sessions"})
         report_roots.append(entry)
+    if apply and ctx_rows:
+        names = {_real(c['path']): n for n, c in ctx_config_roots().items() if c['provider'] == 'hermes'}
+        retired = [(names[_real(r['path'])], r['path']) for r in ctx_rows
+                   if r.get('provider') == 'hermes' and r.get('status') == 'missing'
+                   and _retired_profile_db(r['path']) and _real(r['path']) in names]
+        backup = _backup_ctx_config() if retired else None
+        for name, path in retired if backup else []:
+            rm = runner([ctx_cmd, 'sources', 'remove', '--quiet', name], capture_output=True, text=True,
+                        timeout=120, check=False)
+            applied.append({'agent': 'hermes', 'root': path, 'name': name, 'removed': True, 'retired': True,
+                            'ok': rm.returncode == 0, 'backup': backup,
+                            'detail': ((rm.stdout or rm.stderr or '').strip().splitlines() or [''])[-1]})
     removed = {_real(a['root']) for a in applied if a.get('removed') and a['ok']}
     for r in ctx_rows or []:
         if (r.get('status') == 'missing' and not any(_real(r['path']).startswith(x) for x in removed)
