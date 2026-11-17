@@ -55,6 +55,8 @@ def project(provider,model,config,needed,events=None,now=None):
         start=e.get('physical_started_at',permits.get(permit,{}).get('ts',row.get('ts',now)))
         metered=all(type(row.get(k)) is int for k in ('input_tokens','output_tokens'))
         count=sum(row[k] for k in ('input_tokens','output_tokens')) if metered else permits.get(permit,{}).get('extra',{}).get('quota_reserved_tokens',rule['limits']['tpm'])
+        # A 429 is refused before inference: it spends a request, never tokens.
+        if not metered and e.get('http_status')==429:count=0
         calls.append((start,count))
         if e.get('quota_headers'):headers.append((e.get('physical_finished_at',row.get('ts',now)),e['quota_headers']))
     for key,row in permits.items():
