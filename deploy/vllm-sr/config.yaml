@@ -1,0 +1,989 @@
+version: v0.3
+entrypoints:
+- model_names:
+  - vllm-sr/free
+  - vllm-sr/auto
+  - vllm-sr/free-quality
+  recipe: default
+- model_names:
+  - vllm-sr/turbo
+  recipe: turbo
+- model_names:
+  - vllm-sr/free-reason
+  recipe: reason
+- model_names:
+  - vllm-sr/free-verify
+  recipe: verify
+- model_names:
+  - vllm-sr/free-longctx
+  recipe: longctx
+- model_names:
+  - vllm-sr/free-extract
+  recipe: extract
+- model_names:
+  - vllm-sr/free-classify
+  recipe: classify
+- model_names:
+  - vllm-sr/free-format
+  recipe: format
+recipes:
+- name: turbo
+  description: Free pool, fastest first.
+  routing:
+    decisions:
+    - name: free-fastest
+      priority: 100
+      rules:
+        operator: AND
+        conditions: []
+      description: First backend drawn by capacity x eval weight; then every free
+        backend in order.
+      algorithm:
+        type: random
+      modelRefs:
+      - model: groq-qwen3.8-27b
+        use_reasoning: false
+      - model: groq-gpt-oss-120b
+        use_reasoning: false
+        weight: 44.558
+      - model: groq-gpt-oss-20b
+        use_reasoning: false
+        weight: 34.276
+      - model: cohere-command-a-plus
+        use_reasoning: false
+      - model: cohere-north-mini-code
+        use_reasoning: false
+      - model: or-nemotron-3.5-super-vl
+        use_reasoning: false
+        weight: 15.601
+      - model: nim-nemotron-3-ultra
+        use_reasoning: false
+      - model: nim-laguna-xs-2.1
+        use_reasoning: false
+      - model: nim-mistral-large-4
+        use_reasoning: false
+      - model: or-nemotron-3.5-lightning
+        use_reasoning: false
+      - model: cohere-command-a-reasoning
+        use_reasoning: false
+      - model: or-dots-3-note
+        use_reasoning: false
+      - model: or-flint-v1
+        use_reasoning: false
+      - model: or-nemotron-3-ultra
+        use_reasoning: false
+      - model: or-nemotron-nano-omni
+        use_reasoning: false
+      - model: or-xing4.0-29b
+        use_reasoning: false
+      - model: nim-minimax-m3.1-flash
+        use_reasoning: false
+      - model: nim-step-5-preview
+        use_reasoning: false
+      - model: nim-nemotron-3.5-lightning
+        use_reasoning: false
+      - model: samba-glm-5.3
+        use_reasoning: false
+      - &id001
+        model: local-qwen3-8b
+        use_reasoning: false
+      fallback:
+        enabled: true
+        max_attempts: 21
+        per_attempt_timeout: 120s
+        total_timeout: 600s
+        retryable_status_codes: &id002
+        - 400
+        - 401
+        - 402
+        - 403
+        - 404
+        - 408
+        - 409
+        - 413
+        - 422
+        - 429
+        - 500
+        - 502
+        - 503
+        - 504
+        - 529
+- name: reason
+  description: Free pool, best eval score on reason tasks first.
+  routing:
+    decisions:
+    - name: free-reason
+      priority: 100
+      rules:
+        operator: AND
+        conditions: []
+      description: First backend drawn by capacity x eval weight; then every free
+        backend in order.
+      algorithm:
+        type: random
+      modelRefs:
+      - model: nim-step-5-preview
+        use_reasoning: false
+        weight: 8.356
+      - model: or-nemotron-3.5-super-vl
+        use_reasoning: false
+        weight: 6.5
+      - model: nim-nemotron-3.5-lightning
+        use_reasoning: false
+        weight: 10.0
+      - model: or-nemotron-3-ultra
+        use_reasoning: false
+        weight: 6.5
+      - model: nim-nemotron-3-ultra
+        use_reasoning: false
+        weight: 9.75
+      - model: or-dots-3-note
+        use_reasoning: false
+        weight: 6.5
+      - model: groq-gpt-oss-120b
+        use_reasoning: false
+        weight: 26.34
+      - model: groq-gpt-oss-20b
+        use_reasoning: false
+        weight: 26.34
+      - model: nim-minimax-m3.1-flash
+        use_reasoning: false
+        weight: 7.291
+      - model: groq-qwen3.8-27b
+        use_reasoning: false
+      - model: or-xing4.0-29b
+        use_reasoning: false
+      - model: or-flint-v1
+        use_reasoning: false
+      - model: or-nemotron-3.5-lightning
+        use_reasoning: false
+      - model: or-nemotron-nano-omni
+        use_reasoning: false
+      - model: nim-mistral-large-4
+        use_reasoning: false
+      - model: nim-laguna-xs-2.1
+        use_reasoning: false
+      - model: cohere-command-a-reasoning
+        use_reasoning: false
+      - model: cohere-command-a-plus
+        use_reasoning: false
+      - model: cohere-north-mini-code
+        use_reasoning: false
+      - model: samba-glm-5.3
+        use_reasoning: false
+      - *id001
+      fallback:
+        enabled: true
+        max_attempts: 21
+        per_attempt_timeout: 120s
+        total_timeout: 600s
+        retryable_status_codes: *id002
+- name: verify
+  description: Free pool, best eval score on verify tasks first.
+  routing:
+    decisions:
+    - name: free-verify
+      priority: 100
+      rules:
+        operator: AND
+        conditions: []
+      description: First backend drawn by capacity x eval weight; then every free
+        backend in order.
+      algorithm:
+        type: random
+      modelRefs: &id007
+      - model: nim-step-5-preview
+        use_reasoning: false
+        weight: 9.75
+      - model: or-nemotron-3.5-super-vl
+        use_reasoning: false
+        weight: 6.5
+      - model: nim-nemotron-3.5-lightning
+        use_reasoning: false
+        weight: 10.0
+      - model: or-nemotron-3-ultra
+        use_reasoning: false
+        weight: 6.5
+      - model: nim-nemotron-3-ultra
+        use_reasoning: false
+        weight: 9.75
+      - model: or-dots-3-note
+        use_reasoning: false
+        weight: 6.5
+      - model: groq-gpt-oss-120b
+        use_reasoning: false
+        weight: 26.34
+      - model: groq-gpt-oss-20b
+        use_reasoning: false
+        weight: 26.34
+      - model: nim-minimax-m3.1-flash
+        use_reasoning: false
+        weight: 7.006
+      - model: groq-qwen3.8-27b
+        use_reasoning: false
+      - model: or-xing4.0-29b
+        use_reasoning: false
+      - model: or-flint-v1
+        use_reasoning: false
+      - model: or-nemotron-3.5-lightning
+        use_reasoning: false
+      - model: or-nemotron-nano-omni
+        use_reasoning: false
+      - model: nim-mistral-large-4
+        use_reasoning: false
+      - model: nim-laguna-xs-2.1
+        use_reasoning: false
+      - model: cohere-command-a-reasoning
+        use_reasoning: false
+      - model: cohere-command-a-plus
+        use_reasoning: false
+      - model: cohere-north-mini-code
+        use_reasoning: false
+      - model: samba-glm-5.3
+        use_reasoning: false
+      - *id001
+      fallback:
+        enabled: true
+        max_attempts: 21
+        per_attempt_timeout: 120s
+        total_timeout: 600s
+        retryable_status_codes: *id002
+- name: longctx
+  description: Free pool, best eval score on longctx tasks first.
+  routing:
+    decisions:
+    - name: free-longctx
+      priority: 100
+      rules:
+        operator: AND
+        conditions: []
+      description: First backend drawn by capacity x eval weight; then every free
+        backend in order.
+      algorithm:
+        type: random
+      modelRefs:
+      - model: nim-step-5-preview
+        use_reasoning: false
+        weight: 9.75
+      - model: or-nemotron-3.5-super-vl
+        use_reasoning: false
+        weight: 6.5
+      - model: nim-nemotron-3.5-lightning
+        use_reasoning: false
+        weight: 10.0
+      - model: or-nemotron-3-ultra
+        use_reasoning: false
+        weight: 6.5
+      - model: nim-nemotron-3-ultra
+        use_reasoning: false
+        weight: 9.75
+      - model: or-dots-3-note
+        use_reasoning: false
+        weight: 6.5
+      - model: nim-minimax-m3.1-flash
+        use_reasoning: false
+        weight: 7.207
+      - model: groq-gpt-oss-120b
+        use_reasoning: false
+      - model: groq-gpt-oss-20b
+        use_reasoning: false
+      - model: groq-qwen3.8-27b
+        use_reasoning: false
+      - model: or-xing4.0-29b
+        use_reasoning: false
+      - model: or-flint-v1
+        use_reasoning: false
+      - model: or-nemotron-3.5-lightning
+        use_reasoning: false
+      - model: or-nemotron-nano-omni
+        use_reasoning: false
+      - model: nim-mistral-large-4
+        use_reasoning: false
+      - model: nim-laguna-xs-2.1
+        use_reasoning: false
+      - model: cohere-command-a-reasoning
+        use_reasoning: false
+      - model: cohere-command-a-plus
+        use_reasoning: false
+      - model: cohere-north-mini-code
+        use_reasoning: false
+      - model: samba-glm-5.3
+        use_reasoning: false
+      - *id001
+      fallback:
+        enabled: true
+        max_attempts: 21
+        per_attempt_timeout: 120s
+        total_timeout: 600s
+        retryable_status_codes: *id002
+- name: extract
+  description: Free pool, best eval score on extract tasks first.
+  routing:
+    decisions:
+    - name: free-extract
+      priority: 100
+      rules:
+        operator: AND
+        conditions: []
+      description: First backend drawn by capacity x eval weight; then every free
+        backend in order.
+      algorithm:
+        type: random
+      modelRefs: &id005
+      - model: nim-step-5-preview
+        use_reasoning: false
+        weight: 10.829
+      - model: or-nemotron-3.5-super-vl
+        use_reasoning: false
+        weight: 6.5
+      - model: nim-nemotron-3.5-lightning
+        use_reasoning: false
+        weight: 13.333
+      - model: or-nemotron-3-ultra
+        use_reasoning: false
+        weight: 6.5
+      - model: nim-nemotron-3-ultra
+        use_reasoning: false
+        weight: 13.0
+      - model: or-dots-3-note
+        use_reasoning: false
+        weight: 6.5
+      - model: groq-gpt-oss-120b
+        use_reasoning: false
+        weight: 26.34
+      - model: groq-gpt-oss-20b
+        use_reasoning: false
+        weight: 26.34
+      - model: groq-qwen3.8-27b
+        use_reasoning: false
+      - model: nim-minimax-m3.1-flash
+        use_reasoning: false
+      - model: or-xing4.0-29b
+        use_reasoning: false
+      - model: or-flint-v1
+        use_reasoning: false
+      - model: or-nemotron-3.5-lightning
+        use_reasoning: false
+      - model: or-nemotron-nano-omni
+        use_reasoning: false
+      - model: nim-mistral-large-4
+        use_reasoning: false
+      - model: nim-laguna-xs-2.1
+        use_reasoning: false
+      - model: cohere-command-a-reasoning
+        use_reasoning: false
+      - model: cohere-command-a-plus
+        use_reasoning: false
+      - model: cohere-north-mini-code
+        use_reasoning: false
+      - model: samba-glm-5.3
+        use_reasoning: false
+      - *id001
+      fallback:
+        enabled: true
+        max_attempts: 21
+        per_attempt_timeout: 120s
+        total_timeout: 600s
+        retryable_status_codes: *id002
+- name: classify
+  description: Free pool, best eval score on classify tasks first.
+  routing:
+    decisions:
+    - name: free-classify
+      priority: 100
+      rules:
+        operator: AND
+        conditions: []
+      description: First backend drawn by capacity x eval weight; then every free
+        backend in order.
+      algorithm:
+        type: random
+      modelRefs: &id004
+      - model: nim-step-5-preview
+        use_reasoning: false
+        weight: 9.75
+      - model: or-nemotron-3.5-super-vl
+        use_reasoning: false
+        weight: 6.5
+      - model: nim-nemotron-3.5-lightning
+        use_reasoning: false
+        weight: 10.0
+      - model: or-nemotron-3-ultra
+        use_reasoning: false
+        weight: 6.5
+      - model: nim-nemotron-3-ultra
+        use_reasoning: false
+        weight: 9.75
+      - model: or-dots-3-note
+        use_reasoning: false
+        weight: 6.5
+      - model: groq-gpt-oss-120b
+        use_reasoning: false
+        weight: 26.34
+      - model: groq-gpt-oss-20b
+        use_reasoning: false
+        weight: 26.34
+      - model: nim-minimax-m3.1-flash
+        use_reasoning: false
+        weight: 8.41
+      - model: or-xing4.0-29b
+        use_reasoning: false
+      - model: groq-qwen3.8-27b
+        use_reasoning: false
+      - model: or-flint-v1
+        use_reasoning: false
+      - model: or-nemotron-3.5-lightning
+        use_reasoning: false
+      - model: or-nemotron-nano-omni
+        use_reasoning: false
+      - model: nim-mistral-large-4
+        use_reasoning: false
+      - model: nim-laguna-xs-2.1
+        use_reasoning: false
+      - model: cohere-command-a-reasoning
+        use_reasoning: false
+      - model: cohere-command-a-plus
+        use_reasoning: false
+      - model: cohere-north-mini-code
+        use_reasoning: false
+      - model: samba-glm-5.3
+        use_reasoning: false
+      - *id001
+      fallback:
+        enabled: true
+        max_attempts: 21
+        per_attempt_timeout: 120s
+        total_timeout: 600s
+        retryable_status_codes: *id002
+- name: format
+  description: Free pool, best eval score on format tasks first.
+  routing:
+    decisions:
+    - name: free-format
+      priority: 100
+      rules:
+        operator: AND
+        conditions: []
+      description: First backend drawn by capacity x eval weight; then every free
+        backend in order.
+      algorithm:
+        type: random
+      modelRefs: &id006
+      - model: nim-step-5-preview
+        use_reasoning: false
+        weight: 9.75
+      - model: or-nemotron-3.5-super-vl
+        use_reasoning: false
+        weight: 5.415
+      - model: nim-nemotron-3.5-lightning
+        use_reasoning: false
+        weight: 10.0
+      - model: groq-gpt-oss-120b
+        use_reasoning: false
+        weight: 26.34
+      - model: groq-gpt-oss-20b
+        use_reasoning: false
+        weight: 26.34
+      - model: or-nemotron-3-ultra
+        use_reasoning: false
+        weight: 5.415
+      - model: nim-nemotron-3-ultra
+        use_reasoning: false
+        weight: 8.122
+      - model: or-dots-3-note
+        use_reasoning: false
+        weight: 5.415
+      - model: nim-minimax-m3.1-flash
+        use_reasoning: false
+        weight: 7.207
+      - model: groq-qwen3.8-27b
+        use_reasoning: false
+      - model: or-xing4.0-29b
+        use_reasoning: false
+      - model: or-flint-v1
+        use_reasoning: false
+      - model: or-nemotron-3.5-lightning
+        use_reasoning: false
+      - model: or-nemotron-nano-omni
+        use_reasoning: false
+      - model: nim-mistral-large-4
+        use_reasoning: false
+      - model: nim-laguna-xs-2.1
+        use_reasoning: false
+      - model: cohere-command-a-reasoning
+        use_reasoning: false
+      - model: cohere-command-a-plus
+        use_reasoning: false
+      - model: cohere-north-mini-code
+        use_reasoning: false
+      - model: samba-glm-5.3
+        use_reasoning: false
+      - *id001
+      fallback:
+        enabled: true
+        max_attempts: 21
+        per_attempt_timeout: 120s
+        total_timeout: 600s
+        retryable_status_codes: *id002
+listeners:
+- name: http-8899
+  address: 0.0.0.0
+  port: 8899
+  timeout: 1800s
+global:
+  router:
+    fallback:
+      enabled: true
+      max_attempts: 21
+      circuit_breaker:
+        consecutive_failures: 5
+        cooldown_period: 30s
+        half_open_probes: 1
+  services:
+    observability:
+      tracing: {}
+    response_api: {}
+  stores:
+    response_cache: {}
+providers:
+  defaults:
+    model: nim-step-5-preview
+  models:
+  - name: nim-step-5-preview
+    provider_model_id: stepfun-ai/step-5-preview
+    backend_refs:
+    - name: nim
+      provider: vllm
+      openai_compat_gateway: true
+      base_url: https://integrate.api.nvidia.com/v1
+      weight: 100
+      extra_headers: &id003
+        User-Agent: vllm-sr-free/1
+      api_key_env: NVIDIA_API_KEY
+  - name: or-nemotron-3.5-super-vl
+    provider_model_id: nvidia/nemotron-3.5-super-vl:free
+    backend_refs:
+    - name: openrouter
+      provider: vllm
+      openai_compat_gateway: true
+      base_url: https://openrouter.ai/api/v1
+      weight: 100
+      extra_headers: *id003
+      api_key_env: OPENROUTER_API_KEY
+  - name: or-nemotron-3-ultra
+    provider_model_id: nvidia/nemotron-3-ultra-550b-a55b:free
+    backend_refs:
+    - name: openrouter
+      provider: vllm
+      openai_compat_gateway: true
+      base_url: https://openrouter.ai/api/v1
+      weight: 100
+      extra_headers: *id003
+      api_key_env: OPENROUTER_API_KEY
+  - name: nim-nemotron-3-ultra
+    provider_model_id: nvidia/nemotron-3-ultra-550b-a55b
+    backend_refs:
+    - name: nim
+      provider: vllm
+      openai_compat_gateway: true
+      base_url: https://integrate.api.nvidia.com/v1
+      weight: 100
+      extra_headers: *id003
+      api_key_env: NVIDIA_API_KEY
+  - name: or-dots-3-note
+    provider_model_id: dots-studio/dots-3-note-preview:free
+    backend_refs:
+    - name: openrouter
+      provider: vllm
+      openai_compat_gateway: true
+      base_url: https://openrouter.ai/api/v1
+      weight: 100
+      extra_headers: *id003
+      api_key_env: OPENROUTER_API_KEY
+  - name: or-flint-v1
+    provider_model_id: recursive/flint-v1.0:free
+    backend_refs:
+    - name: openrouter
+      provider: vllm
+      openai_compat_gateway: true
+      base_url: https://openrouter.ai/api/v1
+      weight: 100
+      extra_headers: *id003
+      api_key_env: OPENROUTER_API_KEY
+  - name: groq-gpt-oss-120b
+    provider_model_id: openai/gpt-oss-120b
+    backend_refs:
+    - name: groq-gpt-oss-120b
+      provider: vllm
+      openai_compat_gateway: true
+      base_url: https://api.groq.com/openai/v1
+      weight: 100
+      extra_headers: *id003
+      api_key_env: GROQ_API_KEY
+  - name: nim-nemotron-3.5-lightning
+    provider_model_id: nvidia/nemotron-3.5-lightning-30b-a3b
+    backend_refs:
+    - name: nim
+      provider: vllm
+      openai_compat_gateway: true
+      base_url: https://integrate.api.nvidia.com/v1
+      weight: 100
+      extra_headers: *id003
+      api_key_env: NVIDIA_API_KEY
+  - name: or-nemotron-3.5-lightning
+    provider_model_id: nvidia/nemotron-3.5-lightning:free
+    backend_refs:
+    - name: openrouter
+      provider: vllm
+      openai_compat_gateway: true
+      base_url: https://openrouter.ai/api/v1
+      weight: 100
+      extra_headers: *id003
+      api_key_env: OPENROUTER_API_KEY
+  - name: or-xing4.0-29b
+    provider_model_id: xingchen-agi/xing4.0-29b-a4b:free
+    backend_refs:
+    - name: openrouter
+      provider: vllm
+      openai_compat_gateway: true
+      base_url: https://openrouter.ai/api/v1
+      weight: 100
+      extra_headers: *id003
+      api_key_env: OPENROUTER_API_KEY
+  - name: groq-qwen3.8-27b
+    provider_model_id: qwen/qwen3.8-27b
+    backend_refs:
+    - name: groq-qwen3.8-27b
+      provider: vllm
+      openai_compat_gateway: true
+      base_url: https://api.groq.com/openai/v1
+      weight: 100
+      extra_headers: *id003
+      api_key_env: GROQ_API_KEY
+  - name: or-nemotron-nano-omni
+    provider_model_id: nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free
+    backend_refs:
+    - name: openrouter
+      provider: vllm
+      openai_compat_gateway: true
+      base_url: https://openrouter.ai/api/v1
+      weight: 100
+      extra_headers: *id003
+      api_key_env: OPENROUTER_API_KEY
+  - name: groq-gpt-oss-20b
+    provider_model_id: openai/gpt-oss-20b
+    backend_refs:
+    - name: groq-gpt-oss-20b
+      provider: vllm
+      openai_compat_gateway: true
+      base_url: https://api.groq.com/openai/v1
+      weight: 100
+      extra_headers: *id003
+      api_key_env: GROQ_API_KEY
+  - name: nim-minimax-m3.1-flash
+    provider_model_id: minimaxai/minimax-m3.1-flash
+    backend_refs:
+    - name: nim
+      provider: vllm
+      openai_compat_gateway: true
+      base_url: https://integrate.api.nvidia.com/v1
+      weight: 100
+      extra_headers: *id003
+      api_key_env: NVIDIA_API_KEY
+  - name: nim-mistral-large-4
+    provider_model_id: mistralai/mistral-large-4-1t-a52b
+    backend_refs:
+    - name: nim
+      provider: vllm
+      openai_compat_gateway: true
+      base_url: https://integrate.api.nvidia.com/v1
+      weight: 100
+      extra_headers: *id003
+      api_key_env: NVIDIA_API_KEY
+  - name: nim-laguna-xs-2.1
+    provider_model_id: poolside/laguna-xs-2.1
+    backend_refs:
+    - name: nim
+      provider: vllm
+      openai_compat_gateway: true
+      base_url: https://integrate.api.nvidia.com/v1
+      weight: 100
+      extra_headers: *id003
+      api_key_env: NVIDIA_API_KEY
+  - name: cohere-command-a-reasoning
+    provider_model_id: command-a-reasoning-08-2025
+    backend_refs:
+    - name: cohere
+      provider: vllm
+      openai_compat_gateway: true
+      base_url: https://api.cohere.ai/compatibility/v1
+      weight: 100
+      extra_headers: *id003
+      api_key_env: COHERE_API_KEY
+  - name: cohere-command-a-plus
+    provider_model_id: command-a-plus-05-2026
+    backend_refs:
+    - name: cohere
+      provider: vllm
+      openai_compat_gateway: true
+      base_url: https://api.cohere.ai/compatibility/v1
+      weight: 100
+      extra_headers: *id003
+      api_key_env: COHERE_API_KEY
+  - name: cohere-north-mini-code
+    provider_model_id: north-mini-code-1.0
+    backend_refs:
+    - name: cohere
+      provider: vllm
+      openai_compat_gateway: true
+      base_url: https://api.cohere.ai/compatibility/v1
+      weight: 100
+      extra_headers: *id003
+      api_key_env: COHERE_API_KEY
+  - name: samba-glm-5.3
+    provider_model_id: GLM-5.3
+    backend_refs:
+    - name: samba-glm-5.3
+      provider: vllm
+      openai_compat_gateway: true
+      base_url: https://api.sambanova.ai/v1
+      weight: 100
+      extra_headers: *id003
+      api_key_env: SAMBANOVA_API_KEY
+  - name: local-qwen3-8b
+    provider_model_id: qwen3-8b-q4km
+    backend_refs:
+    - name: local
+      provider: vllm
+      openai_compat_gateway: true
+      base_url: http://100.113.138.100:11530/v1
+      api_key_env: FREE_ANON_API_KEY
+      weight: 100
+      extra_headers: *id003
+routing:
+  modelCards:
+  - name: nim-step-5-preview
+    context_window_size: 6000
+  - name: or-nemotron-3.5-super-vl
+    context_window_size: 1000000
+  - name: or-nemotron-3-ultra
+    context_window_size: 1000000
+  - name: nim-nemotron-3-ultra
+    context_window_size: 1000000
+  - name: or-dots-3-note
+    context_window_size: 512000
+  - name: or-flint-v1
+    context_window_size: 262144
+  - name: groq-gpt-oss-120b
+    context_window_size: 6000
+  - name: nim-nemotron-3.5-lightning
+    context_window_size: 1000000
+  - name: or-nemotron-3.5-lightning
+    context_window_size: 1000000
+  - name: or-xing4.0-29b
+    context_window_size: 6000
+  - name: groq-qwen3.8-27b
+    context_window_size: 6000
+  - name: or-nemotron-nano-omni
+    context_window_size: 256000
+  - name: groq-gpt-oss-20b
+    context_window_size: 6000
+  - name: nim-minimax-m3.1-flash
+    context_window_size: 1000000
+  - name: nim-mistral-large-4
+    context_window_size: 262144
+  - name: nim-laguna-xs-2.1
+    context_window_size: 131072
+  - name: cohere-command-a-reasoning
+    context_window_size: 256000
+  - name: cohere-command-a-plus
+    context_window_size: 30000
+  - name: cohere-north-mini-code
+    context_window_size: 256000
+  - name: samba-glm-5.3
+    context_window_size: 7000
+  - name: local-qwen3-8b
+    context_window_size: 8192
+  signals:
+    keywords:
+    - name: task_classify
+      operator: OR
+      case_sensitive: false
+      keywords:
+      - classify
+      - categorize
+      - categorise
+      - which category
+      - label each
+      - sentiment of
+    - name: task_extract
+      operator: OR
+      case_sensitive: false
+      keywords:
+      - extract
+      - pull out
+      - list every
+      - list all
+      - find all
+      - parse the
+    - name: task_format
+      operator: OR
+      case_sensitive: false
+      keywords:
+      - as json
+      - in json
+      - json schema
+      - as yaml
+      - reformat
+      - format as
+      - convert to
+      - markdown table
+    - name: task_verify
+      operator: OR
+      case_sensitive: false
+      keywords:
+      - verify
+      - double-check
+      - double check
+      - check whether
+      - is this correct
+      - fact-check
+      - review this
+  decisions:
+  - name: auto-classify
+    priority: 200
+    rules:
+      operator: OR
+      conditions:
+      - type: keyword
+        name: task_classify
+    description: First backend drawn by capacity x eval weight; then every free backend
+      in order.
+    algorithm:
+      type: random
+    modelRefs: *id004
+    fallback:
+      enabled: true
+      max_attempts: 21
+      per_attempt_timeout: 120s
+      total_timeout: 600s
+      retryable_status_codes: *id002
+  - name: auto-extract
+    priority: 200
+    rules:
+      operator: OR
+      conditions:
+      - type: keyword
+        name: task_extract
+    description: First backend drawn by capacity x eval weight; then every free backend
+      in order.
+    algorithm:
+      type: random
+    modelRefs: *id005
+    fallback:
+      enabled: true
+      max_attempts: 21
+      per_attempt_timeout: 120s
+      total_timeout: 600s
+      retryable_status_codes: *id002
+  - name: auto-format
+    priority: 200
+    rules:
+      operator: OR
+      conditions:
+      - type: keyword
+        name: task_format
+    description: First backend drawn by capacity x eval weight; then every free backend
+      in order.
+    algorithm:
+      type: random
+    modelRefs: *id006
+    fallback:
+      enabled: true
+      max_attempts: 21
+      per_attempt_timeout: 120s
+      total_timeout: 600s
+      retryable_status_codes: *id002
+  - name: auto-verify
+    priority: 200
+    rules:
+      operator: OR
+      conditions:
+      - type: keyword
+        name: task_verify
+    description: First backend drawn by capacity x eval weight; then every free backend
+      in order.
+    algorithm:
+      type: random
+    modelRefs: *id007
+    fallback:
+      enabled: true
+      max_attempts: 21
+      per_attempt_timeout: 120s
+      total_timeout: 600s
+      retryable_status_codes: *id002
+  - name: free-quality
+    priority: 100
+    rules:
+      operator: AND
+      conditions: []
+    description: First backend drawn by capacity x eval weight; then every free backend
+      in order.
+    algorithm:
+      type: random
+    modelRefs:
+    - model: nim-step-5-preview
+      use_reasoning: false
+      weight: 11.375
+    - model: or-nemotron-3.5-super-vl
+      use_reasoning: false
+      weight: 6.097
+    - model: nim-nemotron-3.5-lightning
+      use_reasoning: false
+      weight: 13.333
+    - model: or-nemotron-3-ultra
+      use_reasoning: false
+      weight: 6.097
+    - model: nim-nemotron-3-ultra
+      use_reasoning: false
+      weight: 12.194
+    - model: or-dots-3-note
+      use_reasoning: false
+      weight: 6.097
+    - model: groq-gpt-oss-120b
+      use_reasoning: false
+      weight: 23.047
+    - model: groq-gpt-oss-20b
+      use_reasoning: false
+      weight: 23.047
+    - model: nim-minimax-m3.1-flash
+      use_reasoning: false
+    - model: groq-qwen3.8-27b
+      use_reasoning: false
+    - model: or-xing4.0-29b
+      use_reasoning: false
+    - model: or-flint-v1
+      use_reasoning: false
+    - model: or-nemotron-3.5-lightning
+      use_reasoning: false
+    - model: or-nemotron-nano-omni
+      use_reasoning: false
+    - model: nim-mistral-large-4
+      use_reasoning: false
+    - model: nim-laguna-xs-2.1
+      use_reasoning: false
+    - model: cohere-command-a-reasoning
+      use_reasoning: false
+    - model: cohere-command-a-plus
+      use_reasoning: false
+    - model: cohere-north-mini-code
+      use_reasoning: false
+    - model: samba-glm-5.3
+      use_reasoning: false
+    - *id001
+    fallback:
+      enabled: true
+      max_attempts: 21
+      per_attempt_timeout: 120s
+      total_timeout: 600s
+      retryable_status_codes: *id002
