@@ -30,8 +30,8 @@
    pullPolicy: IfNotPresent
 -  # -- Image tag (overrides the image tag whose default is the chart appVersion)
 -  tag: ""
-+  # -- Image tag. Pinned to the digest qualified 2026-11-01 (tag+digest: the digest wins).
-+  tag: "latest@sha256:f613ce23a4f8e19357090ef83e614468dd7baa939b4634ad33144584e1c2cb09"
++  # -- Image tag. Pinned to the digest qualified 2026-11-24 (was f613ce23, qualified 11-01; upgraded for upstream #7127 post-tool fallback fix) (tag+digest: the digest wins).
++  tag: "latest@sha256:1007147a50202f726a145b97715c8268a0ede1a98f48de08862dc046aada9b32"
  # -- Image pull secrets for private registries
  imagePullSecrets: []
  # -- Override the name of the chart
